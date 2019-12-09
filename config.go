@@ -15,8 +15,8 @@ type config struct {
 }
 
 type formatter struct {
-	Format string      `json:"format"`
-	Data   interface{} `json:"data"`
+	Format string                 `json:"format"`
+	Data   map[string]interface{} `json:"data"`
 }
 
 func (c *config) setGlobal() {

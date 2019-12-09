@@ -35,6 +35,36 @@ func SetGlobal() {
 	log = (*Logger)(logrus.StandardLogger())
 }
 
+func (l *Logger) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	log = (*Logger)(logrus.New())
+	c := config{}
+	err := unmarshal(&c)
+	if err != nil {
+		return err
+	}
+
+	err = c.parseFormatter()
+	if err != nil {
+		return err
+	}
+
+	err = c.parseLevel()
+	if err != nil {
+		return err
+	}
+
+	err = c.unmarshallFormatter()
+	if err != nil {
+		return err
+	}
+
+	log.ReportCaller = c.LogCaller
+
+	c.setGlobal()
+
+	return nil
+}
+
 func (l *Logger) UnmarshalJSON(data []byte) error {
 	log = (*Logger)(logrus.New())
 	c := config{}

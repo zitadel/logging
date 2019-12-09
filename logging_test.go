@@ -1,63 +1,69 @@
 package logging
 
 import (
-	"bytes"
 	"fmt"
-	"strings"
+	"reflect"
 	"testing"
+
+	"github.com/sirupsen/logrus"
 )
 
-func initBuf() *bytes.Buffer {
-	var buf bytes.Buffer
-	SetOutput(&buf)
-	return &buf
-}
-
-func TestLogOutput(t *testing.T) {
+func TestEntryFields(t *testing.T) {
 	tests := []struct {
-		name          string
-		log           func(...interface{})
-		message       []interface{}
-		shouldContain []string
+		name           string
+		entry          *Entry
+		expectedFields logrus.Fields
 	}{
 		{
-			"warn without error",
-			Log("UTILS-B7l7").Warn,
-			[]interface{}{"check", "check"},
-			[]string{"UTILS-B7l7", "level=warning", "msg=checkcheck", "logID=UTILS-B7l7"},
+			"without error",
+			Log("UTILS-B7l7"),
+			logrus.Fields{"logID": "UTILS-B7l7"},
 		},
 		{
-			"warn with error",
-			Log("UTILS-Ld9V").OnError(fmt.Errorf("im an error")).Warn,
-			[]interface{}{"error ocured"},
-			[]string{"UTILS-Ld9V", "level=warning", "msg=\"error ocured\"", "error=\"im an error\""},
+			"with error",
+			Log("UTILS-Ld9V").WithError(fmt.Errorf("im an error")),
+			logrus.Fields{
+				"logID": "UTILS-Ld9V",
+				"error": fmt.Errorf("im an error"),
+			},
 		},
 		{
-			"warn with fields",
-			LogWithFields("LOGGI-5kk6z", "field1", 134, "field2", "asdlkfj").Warn,
-			[]interface{}{"2 fields"},
-			[]string{"field1=134", "field2=asdlkfj", "msg=\"2 fields\""},
+			"on error",
+			Log("UTILS-Ld9V").OnError(fmt.Errorf("im an error")),
+			logrus.Fields{
+				"logID": "UTILS-Ld9V",
+				"error": fmt.Errorf("im an error"),
+			},
 		},
 		{
-			"warn with field",
-			LogWithFields("LOGGI-5kk6z").WithField("field1", 134).Warn,
-			[]interface{}{"1 field"},
-			[]string{"field1=134", "msg=\"1 field\""},
+			"with fields",
+			LogWithFields("LOGGI-5kk6z", "field1", 134, "field2", "asdlkfj"),
+			logrus.Fields{
+				"field1": 134,
+				"field2": "asdlkfj",
+			},
+		},
+		{
+			"with field",
+			LogWithFields("LOGGI-5kk6z").WithField("field1", 134),
+			logrus.Fields{"field1": 134},
 		},
 		{
 			"fields odd",
-			LogWithFields("LOGGI-xWzy4", "kevin").Warn,
-			[]interface{}{"2 logs expected"},
-			[]string{"oddFields=1"},
+			LogWithFields("LOGGI-xWzy4", "kevin"),
+			logrus.Fields{"oddFields": 1},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			buf := initBuf()
-			test.log(test.message...)
-			for _, substring := range test.shouldContain {
-				if !strings.Contains(buf.String(), substring) {
-					t.Errorf("log (%s) must contain %s", buf, substring)
+			test.entry.Debug()
+			for key, expectedValue := range test.expectedFields {
+				value, ok := test.entry.Data[key]
+				if !ok {
+					t.Errorf("entry data must contain \"%s\"", key)
+				}
+				if !reflect.DeepEqual(expectedValue, value) {
+					t.Errorf("wrong value for \"%s\": expected %T.%v, got %T%v", key, expectedValue, expectedValue, value, value)
 				}
 			}
 		})

@@ -1,13 +1,10 @@
 package logging
 
 import (
-	"github.com/sirupsen/logrus"
-	"io"
-)
+	"time"
 
-func SetOutput(out io.Writer) {
-	logrus.SetOutput(out)
-}
+	"github.com/sirupsen/logrus"
+)
 
 type Entry struct {
 	*logrus.Entry
@@ -23,13 +20,59 @@ func SetIDKey(key string) {
 
 // Log creates a new entry with an id
 func Log(id string) *Entry {
-	return &Entry{Entry: logrus.WithField(idKey, id)}
+	entry := (*logrus.Logger)(log).WithField(idKey, id)
+	entry.Logger = (*logrus.Logger)(log)
+	return &Entry{Entry: entry}
 }
 
 // OnError sets the error. The log will only be printed if err is not nil
 func (e *Entry) OnError(err error) *Entry {
 	e.err = err
 	return e
+}
+
+// LogWithFields creates a new entry with an id and the given fields
+func LogWithFields(id string, fields ...interface{}) *Entry {
+	e := Log(id)
+	return e.SetFields(fields...)
+}
+
+// SetFields sets the given fields on the entry. It panics if length of fields is odd
+func (e *Entry) SetFields(fields ...interface{}) *Entry {
+	logFields := toFields(fields...)
+	return e.WithFields(logFields)
+}
+
+func (e *Entry) WithField(key string, value interface{}) *Entry {
+	e.Entry = e.Entry.WithField(key, value)
+	return e
+}
+
+func (e *Entry) WithFields(fields logrus.Fields) *Entry {
+	e.Entry = e.Entry.WithFields(fields)
+	return e
+}
+
+func (e *Entry) WithError(err error) *Entry {
+	e.Entry = e.Entry.WithError(err)
+	return e
+}
+
+func (e *Entry) WithTime(t time.Time) *Entry {
+	e.Entry = e.Entry.WithTime(t)
+	return e
+}
+
+func toFields(fields ...interface{}) logrus.Fields {
+	if len(fields)%2 != 0 {
+		return logrus.Fields{"oddFields": len(fields)}
+	}
+	logFields := make(logrus.Fields, len(fields)%2)
+	for i := 0; i < len(fields); i = i + 2 {
+		key := fields[i].(string)
+		logFields[key] = fields[i+1]
+	}
+	return logFields
 }
 
 func (e *Entry) Debug(args ...interface{}) {

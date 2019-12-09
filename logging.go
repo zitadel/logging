@@ -8,7 +8,8 @@ import (
 
 type Entry struct {
 	*logrus.Entry
-	err error
+	isOnError bool
+	err       error
 }
 
 var idKey = "logID"
@@ -28,6 +29,7 @@ func Log(id string) *Entry {
 // OnError sets the error. The log will only be printed if err is not nil
 func (e *Entry) OnError(err error) *Entry {
 	e.err = err
+	e.isOnError = true
 	return e
 }
 
@@ -76,116 +78,155 @@ func toFields(fields ...interface{}) logrus.Fields {
 }
 
 func (e *Entry) Debug(args ...interface{}) {
-	e.Log(logrus.DebugLevel, args...)
+	e.log(e.Entry.Debug, args...)
 }
 
 func (e *Entry) Debugln(args ...interface{}) {
-	e.Logln(logrus.DebugLevel, args...)
+	e.logln(e.Entry.Debugln, args...)
 }
 
 func (e *Entry) Debugf(format string, args ...interface{}) {
-	e.Logf(logrus.DebugLevel, format, args...)
+	e.logf(e.Entry.Debugf, format, args...)
 }
 
 func (e *Entry) Info(args ...interface{}) {
-	e.Log(logrus.InfoLevel, args...)
+	e.log(e.Entry.Info, args...)
 }
 
 func (e *Entry) Infoln(args ...interface{}) {
-	e.Logln(logrus.InfoLevel, args...)
+	e.logln(e.Entry.Infoln, args...)
 }
 
 func (e *Entry) Infof(format string, args ...interface{}) {
-	e.Logf(logrus.InfoLevel, format, args...)
+	e.logf(e.Entry.Infof, format, args...)
 }
 
 func (e *Entry) Trace(args ...interface{}) {
-	e.Log(logrus.TraceLevel, args...)
+	e.log(e.Entry.Trace, args...)
 }
 
 func (e *Entry) Traceln(args ...interface{}) {
-	e.Logln(logrus.TraceLevel, args...)
+	e.logln(e.Entry.Traceln, args...)
 }
 
 func (e *Entry) Tracef(format string, args ...interface{}) {
-	e.Logf(logrus.TraceLevel, format, args...)
+	e.logf(e.Entry.Tracef, format, args...)
 }
 
 func (e *Entry) Warn(args ...interface{}) {
-	e.Log(logrus.WarnLevel, args...)
+	e.log(e.Entry.Warn, args...)
 }
 
 func (e *Entry) Warnln(args ...interface{}) {
-	e.Logln(logrus.WarnLevel, args...)
+	e.logln(e.Entry.Warnln, args...)
 }
 
 func (e *Entry) Warnf(format string, args ...interface{}) {
-	e.Logf(logrus.WarnLevel, format, args...)
+	e.logf(e.Entry.Warnf, format, args...)
 }
 
 func (e *Entry) Warning(args ...interface{}) {
-	e.Log(logrus.WarnLevel, args...)
+	e.log(e.Entry.Warning, args...)
 }
 
 func (e *Entry) Warningln(args ...interface{}) {
-	e.Logln(logrus.WarnLevel, args...)
+	e.logln(e.Entry.Warningln, args...)
 }
 
 func (e *Entry) Warningf(format string, args ...interface{}) {
-	e.Logf(logrus.WarnLevel, format, args...)
+	e.logf(e.Entry.Warningf, format, args...)
 }
 
 func (e *Entry) Error(args ...interface{}) {
-	e.Log(logrus.ErrorLevel, args...)
+	e.log(e.Entry.Error, args...)
 }
 
 func (e *Entry) Errorln(args ...interface{}) {
-	e.Logln(logrus.ErrorLevel, args...)
+	e.logln(e.Entry.Errorln, args...)
 }
 
 func (e *Entry) Errorf(format string, args ...interface{}) {
-	e.Logf(logrus.ErrorLevel, format, args...)
+	e.logf(e.Entry.Errorf, format, args...)
 }
 
 func (e *Entry) Fatal(args ...interface{}) {
-	e.Log(logrus.FatalLevel, args...)
+	e.log(e.Entry.Fatal, args...)
 }
 
 func (e *Entry) Fatalln(args ...interface{}) {
-	e.Logln(logrus.FatalLevel, args...)
+	e.logln(e.Entry.Fatalln, args...)
 }
 
 func (e *Entry) Fatalf(format string, args ...interface{}) {
-	e.Logf(logrus.FatalLevel, format, args...)
+	e.logf(e.Entry.Fatalf, format, args...)
 }
 
 func (e *Entry) Panic(args ...interface{}) {
-	e.Log(logrus.PanicLevel, args...)
+	e.log(e.Entry.Panic, args...)
 }
 
 func (e *Entry) Panicln(args ...interface{}) {
-	e.Logln(logrus.PanicLevel, args...)
+	e.logln(e.Entry.Panic, args...)
 }
 
 func (e *Entry) Panicf(format string, args ...interface{}) {
-	e.Logf(logrus.PanicLevel, format, args...)
+	e.logf(e.Entry.Panicf, format, args...)
 }
 
 func (e *Entry) Log(level logrus.Level, args ...interface{}) {
-	e.setError().Entry.Log(level, args...)
+	e = e.checkOnError()
+	if e == nil {
+		return
+	}
+	e.Entry.Log(level, args...)
 }
 
 func (e *Entry) Logf(level logrus.Level, format string, args ...interface{}) {
-	e.setError().Entry.Logf(level, format, args...)
+	e = e.checkOnError()
+	if e == nil {
+		return
+	}
+	e.Entry.Logf(level, format, args...)
 }
 
 func (e *Entry) Logln(level logrus.Level, args ...interface{}) {
-	e.setError().Entry.Logln(level, args...)
+	e = e.checkOnError()
+	if e == nil {
+		return
+	}
+	e.Entry.Logln(level, args...)
 }
 
-func (e *Entry) setError() *Entry {
-	if e.err != nil {
-		e.WithError(e.err)
+func (e *Entry) log(log func(...interface{}), args ...interface{}) {
+	e = e.checkOnError()
+	if e == nil {
+		return
 	}
-	return e
+	log(args...)
+}
+
+func (e *Entry) logf(logf func(string, ...interface{}), format string, args ...interface{}) {
+	e = e.checkOnError()
+	if e == nil {
+		return
+	}
+	logf(format, args...)
+}
+
+func (e *Entry) logln(logln func(...interface{}), args ...interface{}) {
+	e = e.checkOnError()
+	if e == nil {
+		return
+	}
+	logln(args...)
+}
+
+func (e *Entry) checkOnError() *Entry {
+	if !e.isOnError {
+		return e
+	}
+	if e.err != nil {
+		return e.WithError(e.err)
+	}
+	return nil
 }

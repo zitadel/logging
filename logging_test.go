@@ -36,9 +36,17 @@ func TestEntryFields(t *testing.T) {
 			},
 		},
 		{
+			"on error without",
+			Log("UTILS-Ld9V").OnError(nil),
+			logrus.Fields{
+				"logID": "UTILS-Ld9V",
+			},
+		},
+		{
 			"with fields",
 			LogWithFields("LOGGI-5kk6z", "field1", 134, "field2", "asdlkfj"),
 			logrus.Fields{
+				"logID":  "LOGGI-5kk6z",
 				"field1": 134,
 				"field2": "asdlkfj",
 			},
@@ -46,24 +54,30 @@ func TestEntryFields(t *testing.T) {
 		{
 			"with field",
 			LogWithFields("LOGGI-5kk6z").WithField("field1", 134),
-			logrus.Fields{"field1": 134},
+			logrus.Fields{
+				"logID":  "LOGGI-5kk6z",
+				"field1": 134,
+			},
 		},
 		{
 			"fields odd",
 			LogWithFields("LOGGI-xWzy4", "kevin"),
-			logrus.Fields{"oddFields": 1},
+			logrus.Fields{
+				"logID":     "LOGGI-xWzy4",
+				"oddFields": 1,
+			},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			test.entry.Debug()
-			for key, expectedValue := range test.expectedFields {
-				value, ok := test.entry.Data[key]
+			for key, expectedValue := range test.entry.Data {
+				value, ok := test.expectedFields[key]
 				if !ok {
-					t.Errorf("entry data must contain \"%s\"", key)
+					t.Errorf("\"%s\" was not expected", key)
 				}
 				if !reflect.DeepEqual(expectedValue, value) {
-					t.Errorf("wrong value for \"%s\": expected %T.%v, got %T%v", key, expectedValue, expectedValue, value, value)
+					t.Errorf("wrong value for \"%s\": expected %T.%v, got %T.%v", key, expectedValue, expectedValue, value, value)
 				}
 			}
 		})

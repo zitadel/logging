@@ -18,11 +18,21 @@ func SetOutput(out io.Writer) {
 func SetFormatter(formatter logrus.Formatter) {
 	(*logrus.Logger)(log).SetFormatter(formatter)
 }
+
 func SetLevel(level logrus.Level) {
 	(*logrus.Logger)(log).SetLevel(level)
 }
+
 func SetReportCaller(include bool) {
 	(*logrus.Logger)(log).SetReportCaller(include)
+}
+
+func SetGlobal() {
+	logrus.SetFormatter(log.Formatter)
+	logrus.SetLevel(log.Level)
+	logrus.SetReportCaller(log.ReportCaller)
+	logrus.SetOutput(log.Out)
+	log = (*Logger)(logrus.StandardLogger())
 }
 
 func (l *Logger) UnmarshalJSON(data []byte) error {

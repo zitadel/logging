@@ -43,26 +43,7 @@ func (l *Logger) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		return err
 	}
 
-	err = c.parseFormatter()
-	if err != nil {
-		return err
-	}
-
-	err = c.parseLevel()
-	if err != nil {
-		return err
-	}
-
-	err = c.unmarshallFormatter()
-	if err != nil {
-		return err
-	}
-
-	log.ReportCaller = c.LogCaller
-
-	c.setGlobal()
-
-	return nil
+	return l.unmarshal(c)
 }
 
 func (l *Logger) UnmarshalJSON(data []byte) error {
@@ -73,6 +54,10 @@ func (l *Logger) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	return l.unmarshal(c)
+}
+
+func (l *Logger) unmarshal(c config) (err error){
 	err = c.parseFormatter()
 	if err != nil {
 		return err

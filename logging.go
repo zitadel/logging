@@ -78,147 +78,119 @@ func toFields(fields ...interface{}) logrus.Fields {
 }
 
 func (e *Entry) Debug(args ...interface{}) {
-	e.log(e.Entry.Debug, args...)
+	e.log(func() { e.Entry.Debug(args...) })
 }
 
 func (e *Entry) Debugln(args ...interface{}) {
-	e.logln(e.Entry.Debugln, args...)
+	e.log(func() { e.Entry.Debugln(args...) })
 }
 
 func (e *Entry) Debugf(format string, args ...interface{}) {
-	e.logf(e.Entry.Debugf, format, args...)
+	e.log(func() { e.Entry.Debugf(format, args...) })
 }
 
 func (e *Entry) Info(args ...interface{}) {
-	e.log(e.Entry.Info, args...)
+	e.log(func() { e.Entry.Info(args...) })
 }
 
 func (e *Entry) Infoln(args ...interface{}) {
-	e.logln(e.Entry.Infoln, args...)
+	e.log(func() { e.Entry.Infoln(args...) })
 }
 
 func (e *Entry) Infof(format string, args ...interface{}) {
-	e.logf(e.Entry.Infof, format, args...)
+	e.log(func() { e.Entry.Infof(format, args...) })
 }
 
 func (e *Entry) Trace(args ...interface{}) {
-	e.log(e.Entry.Trace, args...)
+	e.log(func() { e.Entry.Trace(args...) })
 }
 
 func (e *Entry) Traceln(args ...interface{}) {
-	e.logln(e.Entry.Traceln, args...)
+	e.log(func() { e.Entry.Traceln(args...) })
 }
 
 func (e *Entry) Tracef(format string, args ...interface{}) {
-	e.logf(e.Entry.Tracef, format, args...)
+	e.log(func() { e.Entry.Tracef(format, args...) })
 }
 
 func (e *Entry) Warn(args ...interface{}) {
-	e.log(e.Entry.Warn, args...)
+	e.log(func() { e.Entry.Warn(args...) })
 }
 
 func (e *Entry) Warnln(args ...interface{}) {
-	e.logln(e.Entry.Warnln, args...)
+	e.log(func() { e.Entry.Warnln(args...) })
 }
 
 func (e *Entry) Warnf(format string, args ...interface{}) {
-	e.logf(e.Entry.Warnf, format, args...)
+	e.log(func() { e.Entry.Warnf(format, args...) })
 }
 
 func (e *Entry) Warning(args ...interface{}) {
-	e.log(e.Entry.Warning, args...)
+	e.log(func() { e.Entry.Warning(args...) })
 }
 
 func (e *Entry) Warningln(args ...interface{}) {
-	e.logln(e.Entry.Warningln, args...)
+	e.log(func() { e.Entry.Warningln(args...) })
 }
 
 func (e *Entry) Warningf(format string, args ...interface{}) {
-	e.logf(e.Entry.Warningf, format, args...)
+	e.log(func() { e.Entry.Warningf(format, args...) })
 }
 
 func (e *Entry) Error(args ...interface{}) {
-	e.log(e.Entry.Error, args...)
+	e.log(func() { e.Entry.Error(args...) })
 }
 
 func (e *Entry) Errorln(args ...interface{}) {
-	e.logln(e.Entry.Errorln, args...)
+	e.log(func() { e.Entry.Errorln(args...) })
 }
 
 func (e *Entry) Errorf(format string, args ...interface{}) {
-	e.logf(e.Entry.Errorf, format, args...)
+	e.log(func() { e.Entry.Errorf(format, args...) })
 }
 
 func (e *Entry) Fatal(args ...interface{}) {
-	e.log(e.Entry.Fatal, args...)
+	e.log(func() { e.Entry.Fatal(args...) })
 }
 
 func (e *Entry) Fatalln(args ...interface{}) {
-	e.logln(e.Entry.Fatalln, args...)
+	e.log(func() { e.Entry.Fatalln(args...) })
 }
 
 func (e *Entry) Fatalf(format string, args ...interface{}) {
-	e.logf(e.Entry.Fatalf, format, args...)
+	e.log(func() { e.Entry.Fatalf(format, args...) })
 }
 
 func (e *Entry) Panic(args ...interface{}) {
-	e.log(e.Entry.Panic, args...)
+	e.log(func() { e.Entry.Panic(args...) })
 }
 
 func (e *Entry) Panicln(args ...interface{}) {
-	e.logln(e.Entry.Panic, args...)
+	e.log(func() { e.Entry.Panic(args...) })
 }
 
 func (e *Entry) Panicf(format string, args ...interface{}) {
-	e.logf(e.Entry.Panicf, format, args...)
+	e.log(func() { e.Entry.Panicf(format, args...) })
 }
 
 func (e *Entry) Log(level logrus.Level, args ...interface{}) {
-	e = e.checkOnError()
-	if e == nil {
-		return
-	}
-	e.Entry.Log(level, args...)
+	e.log(func() { e.Entry.Log(level, args...) })
 }
 
 func (e *Entry) Logf(level logrus.Level, format string, args ...interface{}) {
-	e = e.checkOnError()
-	if e == nil {
-		return
-	}
-	e.Entry.Logf(level, format, args...)
+	e.log(func() { e.Entry.Logf(level, format, args...) })
 }
 
 func (e *Entry) Logln(level logrus.Level, args ...interface{}) {
-	e = e.checkOnError()
-	if e == nil {
-		return
-	}
-	e.Entry.Logln(level, args...)
+	e.log(func() { e.Entry.Logln(level, args...) })
 }
 
-func (e *Entry) log(log func(...interface{}), args ...interface{}) {
+func (e *Entry) log(log func()) {
 	e = e.checkOnError()
 	if e == nil {
 		return
 	}
-	log(args...)
-}
-
-func (e *Entry) logf(logf func(string, ...interface{}), format string, args ...interface{}) {
-	e = e.checkOnError()
-	if e == nil {
-		return
-	}
-	logf(format, args...)
-}
-
-func (e *Entry) logln(logln func(...interface{}), args ...interface{}) {
-	e = e.checkOnError()
-	if e == nil {
-		return
-	}
-	logln(args...)
+	log()
 }
 
 func (e *Entry) checkOnError() *Entry {

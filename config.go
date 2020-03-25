@@ -7,7 +7,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type config struct {
+type Config struct {
 	Level       string    `json:"level"`
 	Formatter   formatter `json:"formatter"`
 	LocalLogger bool      `json:"localLogger"`
@@ -19,7 +19,7 @@ type formatter struct {
 	Data   map[string]interface{} `json:"data"`
 }
 
-func (c *config) setGlobal() {
+func (c *Config) setGlobal() {
 	if c.LocalLogger {
 		return
 	}
@@ -29,7 +29,7 @@ func (c *config) setGlobal() {
 	log = (*Logger)(logrus.StandardLogger())
 }
 
-func (c *config) unmarshallFormatter() error {
+func (c *Config) unmarshallFormatter() error {
 	formatterData, err := json.Marshal(c.Formatter.Data)
 	if err != nil {
 		return err
@@ -37,7 +37,7 @@ func (c *config) unmarshallFormatter() error {
 	return json.Unmarshal(formatterData, log.Formatter)
 }
 
-func (c *config) parseLevel() error {
+func (c *Config) parseLevel() error {
 	if c.Level == "" {
 		log.Level = logrus.InfoLevel
 		return nil
@@ -52,7 +52,7 @@ func (c *config) parseLevel() error {
 	return nil
 }
 
-func (c *config) parseFormatter() error {
+func (c *Config) parseFormatter() error {
 	switch c.Formatter.Format {
 	case "json":
 		log.Formatter = &logrus.JSONFormatter{}

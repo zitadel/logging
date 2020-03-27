@@ -4,6 +4,7 @@
 ![Github Release Badge](https://github.com/caos/logging/workflows/Release/badge.svg)
 [![GitHub release](https://img.shields.io/github/release/caos/logging)](https://GitHub.com/caos/logging/releases/)
 [![GitHub license](https://img.shields.io/github/license/caos/logging)](https://github.com/caos/logging/blob/master/LICENSE)
+[![Go Report Card](https://goreportcard.com/badge/github.com/caos/logging)](https://goreportcard.com/report/github.com/caos/logging)
 
 > This project is in alpha state. It can AND will continue breaking until version 1.0.0 is released
 

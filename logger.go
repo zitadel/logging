@@ -37,7 +37,7 @@ func SetGlobal() {
 
 func (l *Logger) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	log = (*Logger)(logrus.New())
-	c := config{}
+	c := Config{}
 	err := unmarshal(&c)
 	if err != nil {
 		return err
@@ -48,7 +48,7 @@ func (l *Logger) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 func (l *Logger) UnmarshalJSON(data []byte) error {
 	log = (*Logger)(logrus.New())
-	c := config{}
+	c := Config{}
 	err := json.Unmarshal(data, &c)
 	if err != nil {
 		return err
@@ -57,7 +57,7 @@ func (l *Logger) UnmarshalJSON(data []byte) error {
 	return l.unmarshal(c)
 }
 
-func (l *Logger) unmarshal(c config) (err error){
+func (l *Logger) unmarshal(c Config) (err error) {
 	err = c.parseFormatter()
 	if err != nil {
 		return err

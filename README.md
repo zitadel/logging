@@ -1,9 +1,9 @@
 # logging
 
-![semantic-release](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg)
-![Github Release Badge](https://github.com/caos/logging/workflows/Release/badge.svg)
-[![GitHub release](https://img.shields.io/github/release/caos/logging)](https://GitHub.com/caos/logging/releases/)
-[![GitHub license](https://img.shields.io/github/license/caos/logging)](https://github.com/caos/logging/blob/master/LICENSE)
+[![semantic-release](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg)](https://github.com/semantic-release/semantic-release)
+[![Release](https://github.com/caos/logging/workflows/Release/badge.svg)](https://github.com/caos/logging/actions)
+[![license](https://badgen.net/github/license/caos/logging/)](https://github.com/caos/logging/blob/master/LICENSE)
+[![release](https://badgen.net/github/release/caos/logging/stable)](https://github.com/caos/logging/releases)
 [![Go Report Card](https://goreportcard.com/badge/github.com/caos/logging)](https://goreportcard.com/report/github.com/caos/logging)
 
 > This project is in alpha state. It can AND will continue breaking until version 1.0.0 is released

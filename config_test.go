@@ -43,7 +43,7 @@ func TestUnmarshalJSON(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			config := Logger{}
+			config := Config{}
 			err := json.Unmarshal(test.jsonRaw, &config)
 			if !test.expect.wantErr && err != nil {
 				t.Fatalf("no error expected: %s", err)
@@ -110,7 +110,7 @@ formatter:
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			c := Logger{}
+			c := Config{}
 			err := yaml.Unmarshal(test.yamlRaw, &c)
 			if !test.expect.wantErr && err != nil {
 				t.Fatalf("no error expected: %s", err)

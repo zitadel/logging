@@ -19,6 +19,44 @@ type formatter struct {
 	Data   map[string]interface{} `json:"data"`
 }
 
+type loggingConfig Config
+
+func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	log = (*logger)(logrus.New())
+	err := unmarshal((*loggingConfig)(c))
+	if err != nil {
+		return err
+	}
+	return c.unmarshal()
+}
+
+func (c *Config) UnmarshalJSON(data []byte) error {
+	log = (*logger)(logrus.New())
+	err := json.Unmarshal(data, (*loggingConfig)(c))
+	if err != nil {
+		return err
+	}
+	return c.unmarshal()
+}
+
+func (c *Config) unmarshal() (err error) {
+	err = c.parseFormatter()
+	if err != nil {
+		return err
+	}
+	err = c.parseLevel()
+	if err != nil {
+		return err
+	}
+	err = c.unmarshalFormatter()
+	if err != nil {
+		return err
+	}
+	log.ReportCaller = c.LogCaller
+	c.setGlobal()
+	return nil
+}
+
 func (c *Config) setGlobal() {
 	if c.LocalLogger {
 		return
@@ -26,10 +64,10 @@ func (c *Config) setGlobal() {
 	logrus.SetFormatter(log.Formatter)
 	logrus.SetLevel(log.Level)
 	logrus.SetReportCaller(log.ReportCaller)
-	log = (*Logger)(logrus.StandardLogger())
+	log = (*logger)(logrus.StandardLogger())
 }
 
-func (c *Config) unmarshallFormatter() error {
+func (c *Config) unmarshalFormatter() error {
 	formatterData, err := json.Marshal(c.Formatter.Data)
 	if err != nil {
 		return err
@@ -42,13 +80,11 @@ func (c *Config) parseLevel() error {
 		log.Level = logrus.InfoLevel
 		return nil
 	}
-
 	level, err := logrus.ParseLevel(c.Level)
 	if err != nil {
 		return err
 	}
 	log.Level = level
-
 	return nil
 }
 

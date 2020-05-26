@@ -1,15 +1,14 @@
 package logging
 
 import (
-	"encoding/json"
 	"io"
 
 	"github.com/sirupsen/logrus"
 )
 
-type Logger logrus.Logger
+type logger logrus.Logger
 
-var log *Logger = (*Logger)(logrus.StandardLogger())
+var log *logger = (*logger)(logrus.StandardLogger())
 
 func SetOutput(out io.Writer) {
 	(*logrus.Logger)(log).SetOutput(out)
@@ -32,50 +31,5 @@ func SetGlobal() {
 	logrus.SetLevel(log.Level)
 	logrus.SetReportCaller(log.ReportCaller)
 	logrus.SetOutput(log.Out)
-	log = (*Logger)(logrus.StandardLogger())
-}
-
-func (l *Logger) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	log = (*Logger)(logrus.New())
-	c := Config{}
-	err := unmarshal(&c)
-	if err != nil {
-		return err
-	}
-
-	return l.unmarshal(c)
-}
-
-func (l *Logger) UnmarshalJSON(data []byte) error {
-	log = (*Logger)(logrus.New())
-	c := Config{}
-	err := json.Unmarshal(data, &c)
-	if err != nil {
-		return err
-	}
-
-	return l.unmarshal(c)
-}
-
-func (l *Logger) unmarshal(c Config) (err error) {
-	err = c.parseFormatter()
-	if err != nil {
-		return err
-	}
-
-	err = c.parseLevel()
-	if err != nil {
-		return err
-	}
-
-	err = c.unmarshallFormatter()
-	if err != nil {
-		return err
-	}
-
-	log.ReportCaller = c.LogCaller
-
-	c.setGlobal()
-
-	return nil
+	log = (*logger)(logrus.StandardLogger())
 }

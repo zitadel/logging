@@ -89,96 +89,192 @@ func toFields(fields ...interface{}) logrus.Fields {
 	return logFields
 }
 
+func Debug(args ...interface{}) {
+	New().Debug(args...)
+}
+
 func (e *Entry) Debug(args ...interface{}) {
 	e.log(func() { e.Entry.Debug(args...) })
+}
+
+func Debugln(args ...interface{}) {
+	New().Debugln(args...)
 }
 
 func (e *Entry) Debugln(args ...interface{}) {
 	e.log(func() { e.Entry.Debugln(args...) })
 }
 
+func Debugf(format string, args ...interface{}) {
+	New().Debugf(format, args...)
+}
+
 func (e *Entry) Debugf(format string, args ...interface{}) {
 	e.log(func() { e.Entry.Debugf(format, args...) })
+}
+
+func Info(args ...interface{}) {
+	New().Info(args...)
 }
 
 func (e *Entry) Info(args ...interface{}) {
 	e.log(func() { e.Entry.Info(args...) })
 }
 
+func Infoln(args ...interface{}) {
+	New().Infoln(args...)
+}
+
 func (e *Entry) Infoln(args ...interface{}) {
 	e.log(func() { e.Entry.Infoln(args...) })
+}
+
+func Infof(format string, args ...interface{}) {
+	New().Infof(format, args...)
 }
 
 func (e *Entry) Infof(format string, args ...interface{}) {
 	e.log(func() { e.Entry.Infof(format, args...) })
 }
 
+func Trace(args ...interface{}) {
+	New().Trace(args...)
+}
+
 func (e *Entry) Trace(args ...interface{}) {
 	e.log(func() { e.Entry.Trace(args...) })
+}
+
+func Traceln(args ...interface{}) {
+	New().Traceln(args...)
 }
 
 func (e *Entry) Traceln(args ...interface{}) {
 	e.log(func() { e.Entry.Traceln(args...) })
 }
 
+func Tracef(format string, args ...interface{}) {
+	New().Tracef(format, args...)
+}
+
 func (e *Entry) Tracef(format string, args ...interface{}) {
 	e.log(func() { e.Entry.Tracef(format, args...) })
+}
+
+func Warn(args ...interface{}) {
+	New().Warn(args...)
 }
 
 func (e *Entry) Warn(args ...interface{}) {
 	e.log(func() { e.Entry.Warn(args...) })
 }
 
+func Warnln(args ...interface{}) {
+	New().Warnln(args...)
+}
+
 func (e *Entry) Warnln(args ...interface{}) {
 	e.log(func() { e.Entry.Warnln(args...) })
+}
+
+func Warnf(format string, args ...interface{}) {
+	New().Warnf(format, args...)
 }
 
 func (e *Entry) Warnf(format string, args ...interface{}) {
 	e.log(func() { e.Entry.Warnf(format, args...) })
 }
 
+func Warning(args ...interface{}) {
+	New().Warning(args...)
+}
+
 func (e *Entry) Warning(args ...interface{}) {
 	e.log(func() { e.Entry.Warning(args...) })
+}
+
+func Warningln(args ...interface{}) {
+	New().Warningln(args...)
 }
 
 func (e *Entry) Warningln(args ...interface{}) {
 	e.log(func() { e.Entry.Warningln(args...) })
 }
 
+func Warningf(format string, args ...interface{}) {
+	New().Warningf(format, args...)
+}
+
 func (e *Entry) Warningf(format string, args ...interface{}) {
 	e.log(func() { e.Entry.Warningf(format, args...) })
+}
+
+func Error(args ...interface{}) {
+	New().Error(args...)
 }
 
 func (e *Entry) Error(args ...interface{}) {
 	e.log(func() { e.Entry.Error(args...) })
 }
 
+func Errorln(args ...interface{}) {
+	New().Errorln(args...)
+}
+
 func (e *Entry) Errorln(args ...interface{}) {
 	e.log(func() { e.Entry.Errorln(args...) })
+}
+
+func Errorf(format string, args ...interface{}) {
+	New().Errorf(format, args...)
 }
 
 func (e *Entry) Errorf(format string, args ...interface{}) {
 	e.log(func() { e.Entry.Errorf(format, args...) })
 }
 
+func Fatal(args ...interface{}) {
+	New().Fatal(args...)
+}
+
 func (e *Entry) Fatal(args ...interface{}) {
 	e.log(func() { e.Entry.Fatal(args...) })
+}
+
+func Fatalln(args ...interface{}) {
+	New().Fatalln(args...)
 }
 
 func (e *Entry) Fatalln(args ...interface{}) {
 	e.log(func() { e.Entry.Fatalln(args...) })
 }
 
+func Fatalf(format string, args ...interface{}) {
+	New().Fatalf(format, args...)
+}
+
 func (e *Entry) Fatalf(format string, args ...interface{}) {
 	e.log(func() { e.Entry.Fatalf(format, args...) })
+}
+
+func Panic(args ...interface{}) {
+	New().Panic(args...)
 }
 
 func (e *Entry) Panic(args ...interface{}) {
 	e.log(func() { e.Entry.Panic(args...) })
 }
 
+func Panicln(args ...interface{}) {
+	New().Panicln(args...)
+}
+
 func (e *Entry) Panicln(args ...interface{}) {
 	e.log(func() { e.Entry.Panic(args...) })
+}
+
+func Panicf(format string, args ...interface{}) {
+	New().Panicf(format, args...)
 }
 
 func (e *Entry) Panicf(format string, args ...interface{}) {
@@ -189,8 +285,16 @@ func (e *Entry) Log(level logrus.Level, args ...interface{}) {
 	e.log(func() { e.Entry.Log(level, args...) })
 }
 
+func Logf(level logrus.Level, format string, args ...interface{}) {
+	New().Logf(level, format, args...)
+}
+
 func (e *Entry) Logf(level logrus.Level, format string, args ...interface{}) {
 	e.log(func() { e.Entry.Logf(level, format, args...) })
+}
+
+func Logln(level logrus.Level, args ...interface{}) {
+	New().Logln(level, args...)
 }
 
 func (e *Entry) Logln(level logrus.Level, args ...interface{}) {

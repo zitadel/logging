@@ -35,7 +35,7 @@ func LogWithFields(id string, fields ...interface{}) *Entry {
 }
 
 // New instantiates a new entry
-func New(fields ...interface{}) *Entry {
+func New() *Entry {
 	return &Entry{Entry: logrus.NewEntry((*logrus.Logger)(log))}
 }
 

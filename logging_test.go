@@ -31,7 +31,7 @@ func TestWithLogID(t *testing.T) {
 					if !ok {
 						return false
 					}
-					return strings.Contains(s, "github.com/caos/logging/logging_test.go:")
+					return strings.Contains(s, "logging/logging_test.go:")
 				},
 			},
 		},
@@ -51,7 +51,7 @@ func TestWithLogID(t *testing.T) {
 					if !ok {
 						return false
 					}
-					return strings.Contains(s, "github.com/caos/logging/logging_test.go:")
+					return strings.Contains(s, "logging/logging_test.go:")
 				},
 				"error": func(got interface{}) bool {
 					err, ok := got.(error)
@@ -78,7 +78,7 @@ func TestWithLogID(t *testing.T) {
 					if !ok {
 						return false
 					}
-					return strings.Contains(s, "github.com/caos/logging/logging_test.go:")
+					return strings.Contains(s, "logging/logging_test.go:")
 				},
 				"error": func(got interface{}) bool {
 					err, ok := got.(error)
@@ -118,7 +118,7 @@ func TestWithLogID(t *testing.T) {
 					if !ok {
 						return false
 					}
-					return strings.Contains(s, "github.com/caos/logging/logging_test.go:")
+					return strings.Contains(s, "logging/logging_test.go:")
 				},
 				"field1": func(got interface{}) bool {
 					i, ok := got.(int)
@@ -152,7 +152,7 @@ func TestWithLogID(t *testing.T) {
 					if !ok {
 						return false
 					}
-					return strings.Contains(s, "github.com/caos/logging/logging_test.go:")
+					return strings.Contains(s, "logging/logging_test.go:")
 				},
 				"field1": func(got interface{}) bool {
 					i, ok := got.(int)
@@ -179,7 +179,7 @@ func TestWithLogID(t *testing.T) {
 					if !ok {
 						return false
 					}
-					return strings.Contains(s, "github.com/caos/logging/logging_test.go:")
+					return strings.Contains(s, "logging/logging_test.go:")
 				},
 				"oddFields": func(got interface{}) bool {
 					i, ok := got.(int)
@@ -225,7 +225,7 @@ func TestWithoutLogID(t *testing.T) {
 					if !ok {
 						return false
 					}
-					return strings.Contains(s, "github.com/caos/logging/logging_test.go:")
+					return strings.Contains(s, "logging/logging_test.go:")
 				},
 			},
 		},
@@ -238,7 +238,7 @@ func TestWithoutLogID(t *testing.T) {
 					if !ok {
 						return false
 					}
-					return strings.Contains(s, "github.com/caos/logging/logging_test.go:")
+					return strings.Contains(s, "logging/logging_test.go:")
 				},
 				"error": func(got interface{}) bool {
 					err, ok := got.(error)
@@ -258,7 +258,7 @@ func TestWithoutLogID(t *testing.T) {
 					if !ok {
 						return false
 					}
-					return strings.Contains(s, "github.com/caos/logging/logging_test.go:")
+					return strings.Contains(s, "logging/logging_test.go:")
 				},
 				"error": func(got interface{}) bool {
 					err, ok := got.(error)
@@ -283,7 +283,7 @@ func TestWithoutLogID(t *testing.T) {
 					if !ok {
 						return false
 					}
-					return strings.Contains(s, "github.com/caos/logging/logging_test.go:")
+					return strings.Contains(s, "logging/logging_test.go:")
 				},
 				"field1": func(got interface{}) bool {
 					i, ok := got.(int)
@@ -310,7 +310,7 @@ func TestWithoutLogID(t *testing.T) {
 					if !ok {
 						return false
 					}
-					return strings.Contains(s, "github.com/caos/logging/logging_test.go:")
+					return strings.Contains(s, "logging/logging_test.go:")
 				},
 				"field1": func(got interface{}) bool {
 					i, ok := got.(int)
@@ -330,7 +330,7 @@ func TestWithoutLogID(t *testing.T) {
 					if !ok {
 						return false
 					}
-					return strings.Contains(s, "github.com/caos/logging/logging_test.go:")
+					return strings.Contains(s, "logging/logging_test.go:")
 				},
 				"oddFields": func(got interface{}) bool {
 					i, ok := got.(int)

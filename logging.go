@@ -1,6 +1,8 @@
 package logging
 
 import (
+	"fmt"
+	"runtime"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -19,11 +21,27 @@ func SetIDKey(key string) {
 	idKey = key
 }
 
-// Log creates a new entry with an id
+// Deprecated: Log creates a new entry with an id
 func Log(id string) *Entry {
 	entry := (*logrus.Logger)(log).WithField(idKey, id)
 	entry.Logger = (*logrus.Logger)(log)
 	return &Entry{Entry: entry}
+}
+
+// Deprecated: LogWithFields creates a new entry with an id and the given fields
+func LogWithFields(id string, fields ...interface{}) *Entry {
+	e := Log(id)
+	return e.SetFields(fields...)
+}
+
+// New instantiates a new entry
+func New() *Entry {
+	return &Entry{Entry: logrus.NewEntry((*logrus.Logger)(log))}
+}
+
+// WithFields creates a new entry without an id and the given fields
+func WithFields(fields ...interface{}) *Entry {
+	return New().SetFields(fields...)
 }
 
 // OnError sets the error. The log will only be printed if err is not nil
@@ -31,12 +49,6 @@ func (e *Entry) OnError(err error) *Entry {
 	e.err = err
 	e.isOnError = true
 	return e
-}
-
-// LogWithFields creates a new entry with an id and the given fields
-func LogWithFields(id string, fields ...interface{}) *Entry {
-	e := Log(id)
-	return e.SetFields(fields...)
 }
 
 // SetFields sets the given fields on the entry. It panics if length of fields is odd
@@ -190,6 +202,7 @@ func (e *Entry) log(log func()) {
 	if e == nil {
 		return
 	}
+	addCaller(e)
 	log()
 }
 
@@ -201,4 +214,11 @@ func (e *Entry) checkOnError() *Entry {
 		return e.WithError(e.err)
 	}
 	return nil
+}
+
+func addCaller(e *Entry) {
+	_, file, no, ok := runtime.Caller(3)
+	if ok {
+		e.WithField("caller", fmt.Sprintf("%s:%d", file, no))
+	}
 }

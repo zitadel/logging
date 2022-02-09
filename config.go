@@ -11,7 +11,6 @@ type Config struct {
 	Level       string    `json:"level"`
 	Formatter   formatter `json:"formatter"`
 	LocalLogger bool      `json:"localLogger"`
-	LogCaller   bool      `json:"logCaller"`
 }
 
 type formatter struct {
@@ -52,7 +51,6 @@ func (c *Config) unmarshal() (err error) {
 	if err != nil {
 		return err
 	}
-	log.ReportCaller = c.LogCaller
 	c.setGlobal()
 	return nil
 }

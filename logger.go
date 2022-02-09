@@ -22,10 +22,6 @@ func SetLevel(level logrus.Level) {
 	(*logrus.Logger)(log).SetLevel(level)
 }
 
-func SetReportCaller(include bool) {
-	(*logrus.Logger)(log).SetReportCaller(include)
-}
-
 func SetGlobal() {
 	logrus.SetFormatter(log.Formatter)
 	logrus.SetLevel(log.Level)

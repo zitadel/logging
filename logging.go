@@ -90,7 +90,8 @@ func toFields(fields ...interface{}) logrus.Fields {
 }
 
 func Debug(args ...interface{}) {
-	New().Debug(args...)
+	e := New()
+	e.log(func() { e.Entry.Debug(args...) })
 }
 
 func (e *Entry) Debug(args ...interface{}) {
@@ -98,7 +99,8 @@ func (e *Entry) Debug(args ...interface{}) {
 }
 
 func Debugln(args ...interface{}) {
-	New().Debugln(args...)
+	e := New()
+	e.log(func() { e.Entry.Debugln(args...) })
 }
 
 func (e *Entry) Debugln(args ...interface{}) {
@@ -106,7 +108,8 @@ func (e *Entry) Debugln(args ...interface{}) {
 }
 
 func Debugf(format string, args ...interface{}) {
-	New().Debugf(format, args...)
+	e := New()
+	e.log(func() { e.Entry.Debugf(format, args...) })
 }
 
 func (e *Entry) Debugf(format string, args ...interface{}) {
@@ -114,7 +117,8 @@ func (e *Entry) Debugf(format string, args ...interface{}) {
 }
 
 func Info(args ...interface{}) {
-	New().Info(args...)
+	e := New()
+	e.log(func() { e.Entry.Info(args...) })
 }
 
 func (e *Entry) Info(args ...interface{}) {
@@ -122,7 +126,8 @@ func (e *Entry) Info(args ...interface{}) {
 }
 
 func Infoln(args ...interface{}) {
-	New().Infoln(args...)
+	e := New()
+	e.log(func() { e.Entry.Infoln(args...) })
 }
 
 func (e *Entry) Infoln(args ...interface{}) {
@@ -130,7 +135,8 @@ func (e *Entry) Infoln(args ...interface{}) {
 }
 
 func Infof(format string, args ...interface{}) {
-	New().Infof(format, args...)
+	e := New()
+	e.log(func() { e.Entry.Infof(format, args...) })
 }
 
 func (e *Entry) Infof(format string, args ...interface{}) {
@@ -138,7 +144,8 @@ func (e *Entry) Infof(format string, args ...interface{}) {
 }
 
 func Trace(args ...interface{}) {
-	New().Trace(args...)
+	e := New()
+	e.log(func() { e.Entry.Trace(args...) })
 }
 
 func (e *Entry) Trace(args ...interface{}) {
@@ -146,7 +153,8 @@ func (e *Entry) Trace(args ...interface{}) {
 }
 
 func Traceln(args ...interface{}) {
-	New().Traceln(args...)
+	e := New()
+	e.log(func() { e.Entry.Traceln(args...) })
 }
 
 func (e *Entry) Traceln(args ...interface{}) {
@@ -154,7 +162,8 @@ func (e *Entry) Traceln(args ...interface{}) {
 }
 
 func Tracef(format string, args ...interface{}) {
-	New().Tracef(format, args...)
+	e := New()
+	e.log(func() { e.Entry.Tracef(format, args...) })
 }
 
 func (e *Entry) Tracef(format string, args ...interface{}) {
@@ -162,7 +171,8 @@ func (e *Entry) Tracef(format string, args ...interface{}) {
 }
 
 func Warn(args ...interface{}) {
-	New().Warn(args...)
+	e := New()
+	e.log(func() { e.Entry.Warn(args...) })
 }
 
 func (e *Entry) Warn(args ...interface{}) {
@@ -170,7 +180,8 @@ func (e *Entry) Warn(args ...interface{}) {
 }
 
 func Warnln(args ...interface{}) {
-	New().Warnln(args...)
+	e := New()
+	e.log(func() { e.Entry.Warnln(args...) })
 }
 
 func (e *Entry) Warnln(args ...interface{}) {
@@ -178,7 +189,8 @@ func (e *Entry) Warnln(args ...interface{}) {
 }
 
 func Warnf(format string, args ...interface{}) {
-	New().Warnf(format, args...)
+	e := New()
+	e.log(func() { e.Entry.Warnf(format, args...) })
 }
 
 func (e *Entry) Warnf(format string, args ...interface{}) {
@@ -186,7 +198,8 @@ func (e *Entry) Warnf(format string, args ...interface{}) {
 }
 
 func Warning(args ...interface{}) {
-	New().Warning(args...)
+	e := New()
+	e.log(func() { e.Entry.Warning(args...) })
 }
 
 func (e *Entry) Warning(args ...interface{}) {
@@ -194,7 +207,8 @@ func (e *Entry) Warning(args ...interface{}) {
 }
 
 func Warningln(args ...interface{}) {
-	New().Warningln(args...)
+	e := New()
+	e.log(func() { e.Entry.Warningln(args...) })
 }
 
 func (e *Entry) Warningln(args ...interface{}) {
@@ -202,7 +216,8 @@ func (e *Entry) Warningln(args ...interface{}) {
 }
 
 func Warningf(format string, args ...interface{}) {
-	New().Warningf(format, args...)
+	e := New()
+	e.log(func() { e.Entry.Warningf(format, args...) })
 }
 
 func (e *Entry) Warningf(format string, args ...interface{}) {
@@ -210,7 +225,8 @@ func (e *Entry) Warningf(format string, args ...interface{}) {
 }
 
 func Error(args ...interface{}) {
-	New().Error(args...)
+	e := New()
+	e.log(func() { e.Entry.Error(args...) })
 }
 
 func (e *Entry) Error(args ...interface{}) {
@@ -218,7 +234,8 @@ func (e *Entry) Error(args ...interface{}) {
 }
 
 func Errorln(args ...interface{}) {
-	New().Errorln(args...)
+	e := New()
+	e.log(func() { e.Entry.Errorln(args...) })
 }
 
 func (e *Entry) Errorln(args ...interface{}) {
@@ -226,7 +243,8 @@ func (e *Entry) Errorln(args ...interface{}) {
 }
 
 func Errorf(format string, args ...interface{}) {
-	New().Errorf(format, args...)
+	e := New()
+	e.log(func() { e.Entry.Errorf(format, args...) })
 }
 
 func (e *Entry) Errorf(format string, args ...interface{}) {
@@ -234,7 +252,8 @@ func (e *Entry) Errorf(format string, args ...interface{}) {
 }
 
 func Fatal(args ...interface{}) {
-	New().Fatal(args...)
+	e := New()
+	e.log(func() { e.Entry.Fatal(args...) })
 }
 
 func (e *Entry) Fatal(args ...interface{}) {
@@ -242,7 +261,8 @@ func (e *Entry) Fatal(args ...interface{}) {
 }
 
 func Fatalln(args ...interface{}) {
-	New().Fatalln(args...)
+	e := New()
+	e.log(func() { e.Entry.Fatalln(args...) })
 }
 
 func (e *Entry) Fatalln(args ...interface{}) {
@@ -250,7 +270,8 @@ func (e *Entry) Fatalln(args ...interface{}) {
 }
 
 func Fatalf(format string, args ...interface{}) {
-	New().Fatalf(format, args...)
+	e := New()
+	e.log(func() { e.Entry.Fatalf(format, args...) })
 }
 
 func (e *Entry) Fatalf(format string, args ...interface{}) {
@@ -258,7 +279,8 @@ func (e *Entry) Fatalf(format string, args ...interface{}) {
 }
 
 func Panic(args ...interface{}) {
-	New().Panic(args...)
+	e := New()
+	e.log(func() { e.Entry.Panic(args...) })
 }
 
 func (e *Entry) Panic(args ...interface{}) {
@@ -266,7 +288,8 @@ func (e *Entry) Panic(args ...interface{}) {
 }
 
 func Panicln(args ...interface{}) {
-	New().Panicln(args...)
+	e := New()
+	e.log(func() { e.Entry.Panicln(args...) })
 }
 
 func (e *Entry) Panicln(args ...interface{}) {
@@ -274,7 +297,8 @@ func (e *Entry) Panicln(args ...interface{}) {
 }
 
 func Panicf(format string, args ...interface{}) {
-	New().Panicf(format, args...)
+	e := New()
+	e.log(func() { e.Entry.Panicf(format, args...) })
 }
 
 func (e *Entry) Panicf(format string, args ...interface{}) {
@@ -286,7 +310,8 @@ func (e *Entry) Log(level logrus.Level, args ...interface{}) {
 }
 
 func Logf(level logrus.Level, format string, args ...interface{}) {
-	New().Logf(level, format, args...)
+	e := New()
+	e.log(func() { e.Entry.Logf(level, format, args...) })
 }
 
 func (e *Entry) Logf(level logrus.Level, format string, args ...interface{}) {
@@ -294,7 +319,8 @@ func (e *Entry) Logf(level logrus.Level, format string, args ...interface{}) {
 }
 
 func Logln(level logrus.Level, args ...interface{}) {
-	New().Logln(level, args...)
+	e := New()
+	e.log(func() { e.Entry.Logln(level, args...) })
 }
 
 func (e *Entry) Logln(level logrus.Level, args ...interface{}) {

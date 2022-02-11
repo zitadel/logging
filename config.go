@@ -26,7 +26,7 @@ func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	if err != nil {
 		return err
 	}
-	return c.unmarshal()
+	return c.SetLogger()
 }
 
 func (c *Config) UnmarshalJSON(data []byte) error {
@@ -35,10 +35,10 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	return c.unmarshal()
+	return c.SetLogger()
 }
 
-func (c *Config) unmarshal() (err error) {
+func (c *Config) SetLogger() (err error) {
 	err = c.parseFormatter()
 	if err != nil {
 		return err

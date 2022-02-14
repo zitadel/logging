@@ -251,7 +251,7 @@ func TestWithoutLogID(t *testing.T) {
 		},
 		{
 			"on error",
-			New().OnError(errTest),
+			OnError(errTest),
 			map[string]func(interface{}) bool{
 				"caller": func(got interface{}) bool {
 					s, ok := got.(string)
@@ -271,7 +271,7 @@ func TestWithoutLogID(t *testing.T) {
 		},
 		{
 			"on error without",
-			New().OnError(nil),
+			OnError(nil),
 			map[string]func(interface{}) bool{},
 		},
 		{

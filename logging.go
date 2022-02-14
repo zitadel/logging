@@ -39,6 +39,11 @@ func New() *Entry {
 	return &Entry{Entry: logrus.NewEntry((*logrus.Logger)(log))}
 }
 
+func OnError(err error) *Entry {
+	e := New()
+	return e.OnError(err)
+}
+
 // WithFields creates a new entry without an id and the given fields
 func WithFields(fields ...interface{}) *Entry {
 	return New().SetFields(fields...)

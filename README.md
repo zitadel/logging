@@ -14,13 +14,16 @@ TBD
 
 ## Supported Go Versions
 
+For security reasons, we only support and recommend the use of one of the latest two Go versions (:white_check_mark:).  
+Versions that also build are marked with :warning:.
+
 | Version | Supported          |
 |---------|--------------------|
-| <1.11   | :x:                |
-| 1.11    | :white_check_mark: |
-| 1.12    | :white_check_mark: |
-| 1.13    | :white_check_mark: |
-| 1.14    | :white_check_mark: |
+| <1.15   | :x:                |
+| 1.15    | :warning:          |
+| 1.16    | :warning:          |
+| 1.17    | :white_check_mark: |
+| 1.18    | :white_check_mark: |
 
 ## License
 

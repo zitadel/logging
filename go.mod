@@ -1,4 +1,4 @@
-module github.com/caos/logging
+module github.com/zitadel/logging
 
 go 1.13
 

@@ -44,6 +44,11 @@ func OnError(err error) *Entry {
 	return e.OnError(err)
 }
 
+func WithError(err error) *Entry {
+	e := New()
+	return e.WithError(err)
+}
+
 // WithFields creates a new entry without an id and the given fields
 func WithFields(fields ...interface{}) *Entry {
 	return New().SetFields(fields...)

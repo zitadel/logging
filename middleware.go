@@ -9,9 +9,9 @@ import (
 
 type MiddlewareOption func(*middleware)
 
-func MiddlewareWithHandlerOption(handler slog.Handler) MiddlewareOption {
+func MiddlewareWithLoggerOption(logger *slog.Logger) MiddlewareOption {
 	return func(m *middleware) {
-		m.logger = slog.New(handler)
+		m.logger = logger
 	}
 }
 

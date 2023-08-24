@@ -93,11 +93,11 @@ func TestMiddleware(t *testing.T) {
 			handler := slog.NewJSONHandler(logOut, &slog.HandlerOptions{
 				Level: slog.LevelInfo,
 			}).WithAttrs([]slog.Attr{slog.String("time", "not")})
-			handler = WrapHandler(handler)
+			logger := slog.New(WrapHandler(handler))
 
 			clock := clock.NewMock()
 			mw := Middleware(
-				MiddlewareWithHandlerOption(handler),
+				MiddlewareWithLoggerOption(logger),
 				MiddlewareWithIDOption(func() string {
 					return "id1"
 				}),

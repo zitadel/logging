@@ -2,7 +2,6 @@ package logging
 
 import (
 	"net/http"
-	"net/url"
 
 	"github.com/benbjohnson/clock"
 	"golang.org/x/exp/slog"
@@ -10,9 +9,9 @@ import (
 
 type MiddlewareOption func(*middleware)
 
-func MiddlewareWithLoggerOption(logger *slog.Logger) MiddlewareOption {
+func MiddlewareWithHandlerOption(handler slog.Handler) MiddlewareOption {
 	return func(m *middleware) {
-		m.logger = logger
+		m.logger = slog.New(handler)
 	}
 }
 
@@ -28,22 +27,19 @@ func MiddlewareWithClockOptions(clock clock.Clock) MiddlewareOption {
 	}
 }
 
-func MiddlewareWithGroupNames(request, response string) MiddlewareOption {
+func MiddlewareWithGroupName(name string) MiddlewareOption {
 	return func(m *middleware) {
-		m.requestGroup = request
-		m.responseGroup = response
+		m.requestGroup = name
 	}
 }
 
 func Middleware(opts ...MiddlewareOption) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		mw := &middleware{
-			logger:        WrapLogger(slog.Default(), "ctx"),
-			requestGroup:  "request",
-			responseGroup: "response",
-			nextID:        func() string { return "" },
-			clock:         clock.New(),
-			next:          next,
+			logger:       slog.New(WrapHandler(slog.Default().Handler())),
+			requestGroup: "request",
+			clock:        clock.New(),
+			next:         next,
 		}
 		for _, opt := range opts {
 			opt(mw)
@@ -58,44 +54,33 @@ type middleware struct {
 	next   http.Handler
 	clock  clock.Clock
 
-	requestGroup  string
-	responseGroup string
-}
-
-func (m *middleware) setHTTPRequestData(r *http.Request, id string) *http.Request {
-	data := NewContextData(id)
-	data[m.requestGroup] = httpRequestData{
-		method: r.Method,
-		url:    *r.URL,
-	}
-	ctx := ContextWithData(r.Context(), data)
-	return r.WithContext(ctx)
-}
-
-type httpRequestData struct {
-	method string
-	url    url.URL
-}
-
-// LogValue implements [slog.LogValuer]
-func (d httpRequestData) LogValue() slog.Value {
-	return slog.GroupValue([]slog.Attr{
-		slog.String("method", d.method),
-		slog.Any("url", d.url.String()),
-	}...)
+	requestGroup string
 }
 
 func (m *middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := m.clock.Now()
 
-	r = m.setHTTPRequestData(r, m.nextID())
+	if m.nextID != nil {
+		r = r.WithContext(
+			ContextWithData(
+				r.Context(),
+				NewContextData(m.nextID()),
+			),
+		)
+	}
+
 	lw := newLoggedWriter(w)
 	m.next.ServeHTTP(lw, r)
 	logger := m.logger.With(
-		slog.Group(m.responseGroup, "duration", m.clock.Since(start), "status", lw.statusCode, "written", lw.written),
+		slog.Group(m.requestGroup,
+			"url", StringerValuer(r.URL),
+			"method", r.Method,
+			"duration", m.clock.Since(start),
+			"status", lw.statusCode,
+			"written", lw.written),
 	)
 	if lw.err != nil {
-		logger.WarnContext(r.Context(), "response writer", "error", lw.err)
+		logger.WarnContext(r.Context(), "write response", "error", lw.err)
 		return
 	}
 	logger.InfoContext(r.Context(), "request served")

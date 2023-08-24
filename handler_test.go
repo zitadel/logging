@@ -9,11 +9,11 @@ import (
 	"golang.org/x/exp/slog"
 )
 
-func TestWrapLogger(t *testing.T) {
-	parent := slog.Default().With("a", "b")
+func TestWrapHandler(t *testing.T) {
+	parent := slog.Default().With("a", "b").Handler()
 	type args struct {
-		logger       *slog.Logger
-		ctxDataGroup string
+		handler slog.Handler
+		opts    []HandlerOption
 	}
 	tests := []struct {
 		name string
@@ -21,32 +21,43 @@ func TestWrapLogger(t *testing.T) {
 		want slog.Handler
 	}{
 		{
-			name: "nil logger",
-			args: args{nil, ""},
+			name: "already slogHandler",
+			args: args{
+				handler: &slogHandler{
+					handler: parent,
+				},
+			},
 			want: &slogHandler{
-				handler: slog.Default().Handler(),
+				handler: parent,
 			},
 		},
 		{
-			name: "parent logger",
-			args: args{parent, ""},
+			name: "parent handler",
+			args: args{
+				handler: parent,
+			},
 			want: &slogHandler{
-				handler: parent.Handler(),
+				handler: parent,
 			},
 		},
 		{
-			name: "ctx data group",
-			args: args{parent, "ctx"},
+			name: "with CTXGroupName",
+			args: args{
+				handler: parent,
+				opts: []HandlerOption{
+					HandlerWithCTXGroupName("ctx"),
+				},
+			},
 			want: &slogHandler{
-				handler:      parent.Handler(),
-				ctxDataGroup: "ctx",
+				handler:      parent,
+				ctxGroupName: "ctx",
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := WrapLogger(tt.args.logger, tt.args.ctxDataGroup)
-			assert.Equal(t, tt.want, got.Handler())
+			got := WrapHandler(tt.args.handler, tt.args.opts...)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -54,9 +65,12 @@ func TestWrapLogger(t *testing.T) {
 // Test all the handler methods with log output
 func Test_slogHandler_Log(t *testing.T) {
 	logOut := new(strings.Builder)
-	logger := NewLogger(slog.NewJSONHandler(logOut, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}), "ctx")
+	logger := slog.New(WrapHandler(
+		slog.NewJSONHandler(logOut, &slog.HandlerOptions{
+			Level: slog.LevelInfo,
+		}),
+		HandlerWithCTXGroupName("ctx"),
+	))
 
 	// set some data to the context
 	ctx := ContextWithData(context.Background(), ContextData{

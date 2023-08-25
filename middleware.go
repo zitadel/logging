@@ -15,7 +15,7 @@ func WithLogger(logger *slog.Logger) MiddlewareOption {
 	}
 }
 
-func WithIDFunc(nextID func() string) MiddlewareOption {
+func WithIDFunc(nextID func() slog.Attr) MiddlewareOption {
 	return func(m *middleware) {
 		m.nextID = nextID
 	}
@@ -57,7 +57,7 @@ func Middleware(opts ...MiddlewareOption) func(http.Handler) http.Handler {
 
 type middleware struct {
 	logger     *slog.Logger
-	nextID     func() string
+	nextID     func() slog.Attr
 	next       http.Handler
 	clock      clock.Clock
 	reqAttr    func(*http.Request) slog.Attr
@@ -68,7 +68,7 @@ func (m *middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := m.clock.Now()
 	logger := m.logger.With(m.reqAttr(r))
 	if m.nextID != nil {
-		logger = logger.With(slog.String("id", m.nextID()))
+		logger = logger.With(m.nextID())
 	}
 	r = r.WithContext(ToContext(r.Context(), logger))
 

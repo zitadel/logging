@@ -106,8 +106,8 @@ func TestMiddleware(t *testing.T) {
 			clock := clock.NewMock()
 			mw := Middleware(
 				WithLogger(logger),
-				WithIDFunc(func() string {
-					return "id1"
+				WithIDFunc(func() slog.Attr {
+					return slog.String("id", "id1")
 				}),
 				WithClock(clock),
 				WithRequestAttr(requestToAttr),

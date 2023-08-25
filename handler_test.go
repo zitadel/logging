@@ -45,7 +45,7 @@ func TestWrapHandler(t *testing.T) {
 			args: args{
 				handler: parent,
 				opts: []HandlerOption{
-					HandlerWithCTXGroupName("ctx"),
+					WithCTXGroupName("ctx"),
 				},
 			},
 			want: &slogHandler{
@@ -69,7 +69,7 @@ func Test_slogHandler_Log(t *testing.T) {
 		slog.NewJSONHandler(logOut, &slog.HandlerOptions{
 			Level: slog.LevelInfo,
 		}),
-		HandlerWithCTXGroupName("ctx"),
+		WithCTXGroupName("ctx"),
 	))
 
 	// set some data to the context

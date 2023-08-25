@@ -97,12 +97,12 @@ func TestMiddleware(t *testing.T) {
 
 			clock := clock.NewMock()
 			mw := Middleware(
-				MiddlewareWithLoggerOption(logger),
-				MiddlewareWithIDOption(func() string {
+				WithLogger(logger),
+				WithIDFunc(func() string {
 					return "id1"
 				}),
-				MiddlewareWithClockOptions(clock),
-				MiddlewareWithGroupName("request"),
+				WithClock(clock),
+				WithGroupName("request"),
 			)
 
 			w := newTestWriter(tt.err)

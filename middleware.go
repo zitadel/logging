@@ -9,25 +9,25 @@ import (
 
 type MiddlewareOption func(*middleware)
 
-func MiddlewareWithLoggerOption(logger *slog.Logger) MiddlewareOption {
+func WithLogger(logger *slog.Logger) MiddlewareOption {
 	return func(m *middleware) {
 		m.logger = logger
 	}
 }
 
-func MiddlewareWithIDOption(nextID func() string) MiddlewareOption {
+func WithIDFunc(nextID func() string) MiddlewareOption {
 	return func(m *middleware) {
 		m.nextID = nextID
 	}
 }
 
-func MiddlewareWithClockOptions(clock clock.Clock) MiddlewareOption {
+func WithClock(clock clock.Clock) MiddlewareOption {
 	return func(m *middleware) {
 		m.clock = clock
 	}
 }
 
-func MiddlewareWithGroupName(name string) MiddlewareOption {
+func WithGroupName(name string) MiddlewareOption {
 	return func(m *middleware) {
 		m.requestGroup = name
 	}

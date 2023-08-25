@@ -9,10 +9,10 @@ import (
 
 type HandlerOption func(*slogHandler)
 
-// HandlerWithCTXGroupName sets the namespace for data from the context.
+// WithCTXGroupName sets the namespace for data from the context.
 // This can be used to prevent key collisions by nesting all data
 // from the context in a Group.
-func HandlerWithCTXGroupName(name string) HandlerOption {
+func WithCTXGroupName(name string) HandlerOption {
 	return func(sh *slogHandler) {
 		sh.ctxGroupName = name
 	}

@@ -27,19 +27,26 @@ func WithClock(clock clock.Clock) MiddlewareOption {
 	}
 }
 
-func WithGroupName(name string) MiddlewareOption {
+func WithRequestAttr(requestToAttr func(*http.Request) slog.Attr) MiddlewareOption {
 	return func(m *middleware) {
-		m.requestGroup = name
+		m.reqAttr = requestToAttr
+	}
+}
+
+func WithLoggedWriter(wrap func(w http.ResponseWriter) LoggedWriter) MiddlewareOption {
+	return func(m *middleware) {
+		m.wrapWriter = wrap
 	}
 }
 
 func Middleware(opts ...MiddlewareOption) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		mw := &middleware{
-			logger:       slog.New(WrapHandler(slog.Default().Handler())),
-			requestGroup: "request",
-			clock:        clock.New(),
-			next:         next,
+			logger:     slog.Default(),
+			clock:      clock.New(),
+			next:       next,
+			reqAttr:    requestToAttr,
+			wrapWriter: newLoggedWriter,
 		}
 		for _, opt := range opts {
 			opt(mw)
@@ -49,38 +56,30 @@ func Middleware(opts ...MiddlewareOption) func(http.Handler) http.Handler {
 }
 
 type middleware struct {
-	logger *slog.Logger
-	nextID func() string
-	next   http.Handler
-	clock  clock.Clock
-
-	requestGroup string
+	logger     *slog.Logger
+	nextID     func() string
+	next       http.Handler
+	clock      clock.Clock
+	reqAttr    func(*http.Request) slog.Attr
+	wrapWriter func(http.ResponseWriter) LoggedWriter
 }
 
 func (m *middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := m.clock.Now()
-
+	logger := m.logger.With(m.reqAttr(r))
 	if m.nextID != nil {
-		r = r.WithContext(
-			ContextWithData(
-				r.Context(),
-				NewContextData(m.nextID()),
-			),
-		)
+		logger = logger.With(slog.String("id", m.nextID()))
 	}
+	r = r.WithContext(ToContext(r.Context(), logger))
 
-	lw := newLoggedWriter(w)
+	lw := m.wrapWriter(w)
 	m.next.ServeHTTP(lw, r)
-	logger := m.logger.With(
-		slog.Group(m.requestGroup,
-			"url", StringerValuer(r.URL),
-			"method", r.Method,
-			"duration", m.clock.Since(start),
-			"status", lw.statusCode,
-			"written", lw.written),
+	logger = logger.With(
+		slog.Duration("duration", m.clock.Since(start)),
+		lw.Attr(),
 	)
-	if lw.err != nil {
-		logger.WarnContext(r.Context(), "write response", "error", lw.err)
+	if err := lw.Err(); err != nil {
+		logger.WarnContext(r.Context(), "write response", "error", err)
 		return
 	}
 	logger.InfoContext(r.Context(), "request served")
@@ -94,7 +93,7 @@ type loggedWriter struct {
 	err        error
 }
 
-func newLoggedWriter(w http.ResponseWriter) *loggedWriter {
+func newLoggedWriter(w http.ResponseWriter) LoggedWriter {
 	return &loggedWriter{
 		ResponseWriter: w,
 	}
@@ -113,4 +112,15 @@ func (w *loggedWriter) Write(b []byte) (int, error) {
 	w.written += n
 	w.err = err
 	return n, err
+}
+
+func (lw *loggedWriter) Attr() slog.Attr {
+	return slog.Group("response",
+		"status", lw.statusCode,
+		"written", lw.written,
+	)
+}
+
+func (lw *loggedWriter) Err() error {
+	return lw.err
 }

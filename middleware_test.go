@@ -14,6 +14,14 @@ import (
 	"golang.org/x/exp/slog"
 )
 
+func newTestLogger() (out *strings.Builder, logger *slog.Logger) {
+	out = new(strings.Builder)
+	handler := slog.NewJSONHandler(out, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}).WithAttrs([]slog.Attr{slog.String("time", "not")})
+	return out, slog.New(handler)
+}
+
 type testWriter struct {
 	*httptest.ResponseRecorder
 	err error
@@ -53,10 +61,12 @@ func TestMiddleware(t *testing.T) {
 				"time": "not",
 				"msg":"request served",
 				"id":"id1",
+				"duration":1000000000,
 				"request":{
 					"method":"GET",
-					"url":"https://example.com/path/",
-					"duration":1000000000,
+					"url":"https://example.com/path/"
+				},
+				"response":{
 					"status":200,
 					"written":13
 				}
@@ -77,10 +87,12 @@ func TestMiddleware(t *testing.T) {
 				"msg":"write response",
 				"error": "io: read/write on closed pipe",
 				"id":"id1",
+				"duration":1000000000,
 				"request":{
 					"method":"GET",
-					"url":"https://example.com/path/",
-					"duration":1000000000,
+					"url":"https://example.com/path/"
+				},
+				"response":{
 					"status":200,
 					"written":0
 				}
@@ -89,11 +101,7 @@ func TestMiddleware(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logOut := new(strings.Builder)
-			handler := slog.NewJSONHandler(logOut, &slog.HandlerOptions{
-				Level: slog.LevelInfo,
-			}).WithAttrs([]slog.Attr{slog.String("time", "not")})
-			logger := slog.New(WrapHandler(handler))
+			logOut, logger := newTestLogger()
 
 			clock := clock.NewMock()
 			mw := Middleware(
@@ -102,7 +110,8 @@ func TestMiddleware(t *testing.T) {
 					return "id1"
 				}),
 				WithClock(clock),
-				WithGroupName("request"),
+				WithRequestAttr(requestToAttr),
+				WithLoggedWriter(newLoggedWriter),
 			)
 
 			w := newTestWriter(tt.err)

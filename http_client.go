@@ -15,13 +15,13 @@ func WithClientClock(clock clock.Clock) ClientLoggerOption {
 	}
 }
 
-func WithRequestToAttr(requestToAttr func(*http.Request) slog.Attr) ClientLoggerOption {
+func WithClientRequestAttr(requestToAttr func(*http.Request) slog.Attr) ClientLoggerOption {
 	return func(lrt *logRountTripper) {
 		lrt.reqToAttr = requestToAttr
 	}
 }
 
-func WithResponseToAttr(responseToAttr func(*http.Response) slog.Attr) ClientLoggerOption {
+func WithClientResponseAttr(responseToAttr func(*http.Response) slog.Attr) ClientLoggerOption {
 	return func(lrt *logRountTripper) {
 		lrt.resToAttr = responseToAttr
 	}
@@ -67,23 +67,4 @@ func (l *logRountTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		l.resToAttr(resp),
 	)
 	return resp, err
-}
-
-var _ http.RoundTripper = &logRountTripper{}
-
-func requestToAttr(req *http.Request) slog.Attr {
-	return slog.Group("request",
-		slog.String("method", req.Method),
-		slog.String("url", req.URL.String()),
-		slog.Any("header", req.Header),
-		slog.Int64("content_length", req.ContentLength),
-	)
-}
-
-func responseToAttr(resp *http.Response) slog.Attr {
-	return slog.Group("response",
-		slog.String("status", resp.Status),
-		slog.Any("header", resp.Header),
-		slog.Int64("content_length", resp.ContentLength),
-	)
 }

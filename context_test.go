@@ -9,11 +9,13 @@ import (
 )
 
 func TestContext(t *testing.T) {
-	want := slog.Default()
-	got := FromContext(context.Background())
-	assert.Equal(t, want, got)
+	got, ok := FromContext(context.Background())
+	assert.False(t, ok)
+	assert.Nil(t, got)
 
+	want := slog.Default()
 	ctx := ToContext(context.Background(), want)
-	got = FromContext(ctx)
+	got, ok = FromContext(ctx)
+	assert.True(t, ok)
 	assert.Equal(t, want, got)
 }

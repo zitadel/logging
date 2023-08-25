@@ -10,11 +10,9 @@ type ctxKeyType struct{}
 
 var ctxKey ctxKeyType
 
-func FromContext(ctx context.Context) *slog.Logger {
-	if logger, ok := ctx.Value(ctxKey).(*slog.Logger); ok {
-		return logger
-	}
-	return slog.Default()
+func FromContext(ctx context.Context) (logger *slog.Logger, ok bool) {
+	logger, ok = ctx.Value(ctxKey).(*slog.Logger)
+	return logger, ok
 }
 
 func ToContext(ctx context.Context, logger *slog.Logger) context.Context {

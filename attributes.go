@@ -34,7 +34,6 @@ func requestToAttr(req *http.Request) slog.Attr {
 func responseToAttr(resp *http.Response) slog.Attr {
 	return slog.Group("response",
 		slog.String("status", resp.Status),
-		slog.Any("header", resp.Header),
 		slog.Int64("content_length", resp.ContentLength),
 	)
 }

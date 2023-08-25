@@ -58,13 +58,11 @@ func (l *logRountTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	logger := l.logger.With(l.reqToAttr(req))
 
 	resp, err := l.next.RoundTrip(req)
+	logger = logger.With("duration", l.clock.Since(start))
 	if err != nil {
 		logger.Error("request roundtrip", "error", err)
+		return resp, err
 	}
-
-	logger.Info("request roundtrip",
-		slog.Duration("duration", l.clock.Since(start)),
-		l.resToAttr(resp),
-	)
-	return resp, err
+	logger.Info("request roundtrip", l.resToAttr(resp))
+	return resp, nil
 }

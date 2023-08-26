@@ -34,13 +34,13 @@ func WithClientResponseAttr(responseToAttr func(*http.Response) slog.Attr) Clien
 	}
 }
 
-// SetClientLogger adds slog functionality to the HTTP client.
+// EnableHTTPClient adds slog functionality to the HTTP client.
 // It attempts to obtain a logger with [FromContext].
 // If no logger is in the context, it tries to use a fallback logger,
 // which might be set by [WithFallbackLogger].
 // If no logger was found finally, the Transport is
 // executed without logging.
-func SetClientLogger(c *http.Client, opts ...ClientLoggerOption) {
+func EnableHTTPClient(c *http.Client, opts ...ClientLoggerOption) {
 	lrt := &logRountTripper{
 		next:      c.Transport,
 		clock:     clock.New(),

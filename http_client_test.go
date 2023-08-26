@@ -19,7 +19,7 @@ func (errRountripper) RoundTrip(*http.Request) (*http.Response, error) {
 	return nil, io.ErrClosedPipe
 }
 
-func Test_ClientLogger(t *testing.T) {
+func Test_EnableHTTPClient(t *testing.T) {
 	tests := []struct {
 		name      string
 		transport http.RoundTripper
@@ -96,7 +96,7 @@ func Test_ClientLogger(t *testing.T) {
 			c := &http.Client{
 				Transport: tt.transport,
 			}
-			SetClientLogger(c,
+			EnableHTTPClient(c,
 				WithFallbackLogger(logger),
 				WithClientClock(clock),
 				WithClientRequestAttr(requestToAttr),

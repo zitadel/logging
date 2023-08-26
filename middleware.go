@@ -15,6 +15,14 @@ func WithLogger(logger *slog.Logger) MiddlewareOption {
 	}
 }
 
+// WithGroup groups the log attributes
+// produced by the middleware.
+func WithGroup(name string) MiddlewareOption {
+	return func(m *middleware) {
+		m.group = name
+	}
+}
+
 func WithIDFunc(nextID func() slog.Attr) MiddlewareOption {
 	return func(m *middleware) {
 		m.nextID = nextID
@@ -57,6 +65,7 @@ func Middleware(opts ...MiddlewareOption) func(http.Handler) http.Handler {
 
 type middleware struct {
 	logger     *slog.Logger
+	group      string
 	nextID     func() slog.Attr
 	next       http.Handler
 	clock      clock.Clock
@@ -66,18 +75,19 @@ type middleware struct {
 
 func (m *middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := m.clock.Now()
-	logger := m.logger.With(m.reqAttr(r))
+
+	logger := m.logger.With(slog.Group(m.group, m.reqAttr(r)))
 	if m.nextID != nil {
-		logger = logger.With(m.nextID())
+		logger = logger.With(slog.Group(m.group, m.nextID()))
 	}
 	r = r.WithContext(ToContext(r.Context(), logger))
 
 	lw := m.wrapWriter(w)
 	m.next.ServeHTTP(lw, r)
-	logger = logger.With(
+	logger = logger.With(slog.Group(m.group,
 		slog.Duration("duration", m.clock.Since(start)),
 		lw.Attr(),
-	)
+	))
 	if err := lw.Err(); err != nil {
 		logger.WarnContext(r.Context(), "write response", "error", err)
 		return

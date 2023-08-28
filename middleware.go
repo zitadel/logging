@@ -9,6 +9,10 @@ import (
 
 type MiddlewareOption func(*middleware)
 
+// WitLogger sets the passed logger with request attributes
+// into the Request's context.
+//
+// EXPERIMENTAL: Will change to log/slog import after we drop support for Go 1.20
 func WithLogger(logger *slog.Logger) MiddlewareOption {
 	return func(m *middleware) {
 		m.logger = logger
@@ -23,31 +27,49 @@ func WithGroup(name string) MiddlewareOption {
 	}
 }
 
+// WithIDFunc enables the creating of request IDs
+// in the middleware, which are then attached to
+// the logger.
 func WithIDFunc(nextID func() slog.Attr) MiddlewareOption {
 	return func(m *middleware) {
 		m.nextID = nextID
 	}
 }
 
+// WithClock allows overiding the request duration
+// clock for testing.
 func WithClock(clock clock.Clock) MiddlewareOption {
 	return func(m *middleware) {
 		m.clock = clock
 	}
 }
 
+// WithRequestAttr allows costumizing the information used
+// from a request as request attributes.
 func WithRequestAttr(requestToAttr func(*http.Request) slog.Attr) MiddlewareOption {
 	return func(m *middleware) {
 		m.reqAttr = requestToAttr
 	}
 }
 
+// WithLoggedWriter allows customizing the writer from
+// which post-request attributes are taken.
 func WithLoggedWriter(wrap func(w http.ResponseWriter) LoggedWriter) MiddlewareOption {
 	return func(m *middleware) {
 		m.wrapWriter = wrap
 	}
 }
 
-func Middleware(opts ...MiddlewareOption) func(http.Handler) http.Handler {
+// Middleware enables request logging and sets a logger
+// to the request context.
+// Use [FromContext] to obtain the logger anywhere in the request liftime.
+//
+// The default logger is [slog.Default], with the request's URL and Method
+// as preset attributes.
+// When the request terminates, a INFO line with the Status Code and
+// amount written to the client is printed.
+// This behaviors can be modified with options.
+func Middleware(options ...MiddlewareOption) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		mw := &middleware{
 			logger:     slog.Default(),
@@ -56,7 +78,7 @@ func Middleware(opts ...MiddlewareOption) func(http.Handler) http.Handler {
 			reqAttr:    requestToAttr,
 			wrapWriter: newLoggedWriter,
 		}
-		for _, opt := range opts {
+		for _, opt := range options {
 			opt(mw)
 		}
 		return mw

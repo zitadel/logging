@@ -44,7 +44,7 @@ func WithClock(clock clock.Clock) MiddlewareOption {
 	}
 }
 
-// WithRequestAttr allows costumizing the information used
+// WithRequestAttr allows customizing the information used
 // from a request as request attributes.
 func WithRequestAttr(requestToAttr func(*http.Request) slog.Attr) MiddlewareOption {
 	return func(m *middleware) {

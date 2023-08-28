@@ -10,24 +10,42 @@ import (
 
 type ClientLoggerOption func(*logRountTripper)
 
+// WithFallbackLogger uses the passed logger if none was
+// found in the context.
+//
+// EXPERIMENTAL: Will change to log/slog import after we drop support for Go 1.20
 func WithFallbackLogger(logger *slog.Logger) ClientLoggerOption {
 	return func(lrt *logRountTripper) {
 		lrt.fallback = logger
 	}
 }
 
+// WithClientClock allows overiding the request duration
+// clock for testing.
 func WithClientClock(clock clock.Clock) ClientLoggerOption {
 	return func(lrt *logRountTripper) {
 		lrt.clock = clock
 	}
 }
 
+// WithClientGroup groups the log attributes
+// produced by the client.
+func WithClientGroup(name string) ClientLoggerOption {
+	return func(lrt *logRountTripper) {
+		lrt.group = name
+	}
+}
+
+// WithClientRequestAttr allows customizing the information used
+// from a request as request attributes.
 func WithClientRequestAttr(requestToAttr func(*http.Request) slog.Attr) ClientLoggerOption {
 	return func(lrt *logRountTripper) {
 		lrt.reqToAttr = requestToAttr
 	}
 }
 
+// WithClientResponseAttr allows customizing the information used
+// from a response as response attributes.
 func WithClientResponseAttr(responseToAttr func(*http.Response) slog.Attr) ClientLoggerOption {
 	return func(lrt *logRountTripper) {
 		lrt.resToAttr = responseToAttr
@@ -61,6 +79,7 @@ type logRountTripper struct {
 	clock    clock.Clock
 	fallback *slog.Logger
 
+	group     string
 	reqToAttr func(*http.Request) slog.Attr
 	resToAttr func(*http.Response) slog.Attr
 }
@@ -74,7 +93,7 @@ func (l *logRountTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	start := l.clock.Now()
 
 	resp, err := l.next.RoundTrip(req)
-	logger = logger.With(
+	logger = logger.WithGroup(l.group).With(
 		l.reqToAttr(req),
 		slog.Duration("duration", l.clock.Since(start)),
 	)

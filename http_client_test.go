@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/benbjohnson/clock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -67,7 +66,7 @@ func Test_EnableHTTPClient(t *testing.T) {
 				"time":"not",
 				"request":{"method":"GET","url":"%s"},
 				"error":"io: read/write on closed pipe",
-				"duration":0
+				"duration":1000000000
 			}`,
 		},
 		{
@@ -92,20 +91,20 @@ func Test_EnableHTTPClient(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			out, logger := newTestLogger()
-			clock := clock.NewMock()
 			c := &http.Client{
 				Transport: tt.transport,
 			}
 			EnableHTTPClient(c,
 				WithFallbackLogger(logger),
-				WithClientClock(clock),
+				WithClientDurationFunc(func(t time.Time) time.Duration {
+					return time.Second
+				}),
 				WithClientRequestAttr(requestToAttr),
 				WithClientResponseAttr(responseToAttr),
 			)
 
 			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprintln(w, "Hello, client")
-				clock.Add(time.Second)
 			}))
 			defer ts.Close()
 

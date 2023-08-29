@@ -3,7 +3,6 @@ module github.com/zitadel/logging
 go 1.19
 
 require (
-	github.com/benbjohnson/clock v1.3.5
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
 	golang.org/x/exp v0.0.0-20230817173708-d852ddb80c63

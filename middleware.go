@@ -2,8 +2,8 @@ package logging
 
 import (
 	"net/http"
+	"time"
 
-	"github.com/benbjohnson/clock"
 	"golang.org/x/exp/slog"
 )
 
@@ -36,11 +36,10 @@ func WithIDFunc(nextID func() slog.Attr) MiddlewareOption {
 	}
 }
 
-// WithClock allows overiding the request duration
-// clock for testing.
-func WithClock(clock clock.Clock) MiddlewareOption {
+// WithDurationFunc allows overiding the request duration for testing.
+func WithDurationFunc(df func(time.Time) time.Duration) MiddlewareOption {
 	return func(m *middleware) {
-		m.clock = clock
+		m.duration = df
 	}
 }
 
@@ -73,7 +72,7 @@ func Middleware(options ...MiddlewareOption) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		mw := &middleware{
 			logger:     slog.Default(),
-			clock:      clock.New(),
+			duration:   time.Since,
 			next:       next,
 			reqAttr:    requestToAttr,
 			wrapWriter: newLoggedWriter,
@@ -90,13 +89,13 @@ type middleware struct {
 	group      string
 	nextID     func() slog.Attr
 	next       http.Handler
-	clock      clock.Clock
+	duration   func(time.Time) time.Duration
 	reqAttr    func(*http.Request) slog.Attr
 	wrapWriter func(http.ResponseWriter) LoggedWriter
 }
 
 func (m *middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	start := m.clock.Now()
+	start := time.Now()
 
 	logger := m.logger.With(slog.Group(m.group, m.reqAttr(r)))
 	if m.nextID != nil {
@@ -107,7 +106,7 @@ func (m *middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	lw := m.wrapWriter(w)
 	m.next.ServeHTTP(lw, r)
 	logger = logger.With(slog.Group(m.group,
-		slog.Duration("duration", m.clock.Since(start)),
+		slog.Duration("duration", m.duration(start)),
 		lw.Attr(),
 	))
 	if err := lw.Err(); err != nil {

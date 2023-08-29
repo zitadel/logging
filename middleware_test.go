@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/benbjohnson/clock"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/exp/slog"
 )
@@ -44,18 +43,11 @@ func newTestWriter(err error) *testWriter {
 func TestMiddleware(t *testing.T) {
 	tests := []struct {
 		name string
-		next func(*clock.Mock) http.HandlerFunc
 		err  error
 		want string
 	}{
 		{
 			name: "ok",
-			next: func(c *clock.Mock) http.HandlerFunc {
-				return func(w http.ResponseWriter, r *http.Request) {
-					c.Add(time.Second)
-					fmt.Fprint(w, "Hello, World!")
-				}
-			},
 			want: `{
 				"level":"INFO",
 				"time": "not",
@@ -74,13 +66,7 @@ func TestMiddleware(t *testing.T) {
 		},
 		{
 			name: "error",
-			next: func(c *clock.Mock) http.HandlerFunc {
-				return func(w http.ResponseWriter, r *http.Request) {
-					c.Add(time.Second)
-					fmt.Fprint(w, "Hello, World!")
-				}
-			},
-			err: io.ErrClosedPipe,
+			err:  io.ErrClosedPipe,
 			want: `{
 				"level":"WARN",
 				"time": "not",
@@ -103,20 +89,25 @@ func TestMiddleware(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			logOut, logger := newTestLogger()
 
-			clock := clock.NewMock()
 			mw := Middleware(
 				WithLogger(logger),
 				WithIDFunc(func() slog.Attr {
 					return slog.String("id", "id1")
 				}),
-				WithClock(clock),
+				WithDurationFunc(func(time.Time) time.Duration {
+					return time.Second
+				}),
 				WithRequestAttr(requestToAttr),
 				WithLoggedWriter(newLoggedWriter),
 			)
 
+			next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				fmt.Fprint(w, "Hello, World!")
+			})
+
 			w := newTestWriter(tt.err)
 			r := httptest.NewRequest("GET", "https://example.com/path/", nil)
-			mw(tt.next(clock)).ServeHTTP(w, r)
+			mw(next).ServeHTTP(w, r)
 
 			got := logOut.String()
 			assert.JSONEq(t, tt.want, got)

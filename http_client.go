@@ -3,8 +3,8 @@ package logging
 import (
 	"context"
 	"net/http"
+	"time"
 
-	"github.com/benbjohnson/clock"
 	"golang.org/x/exp/slog"
 )
 
@@ -20,11 +20,11 @@ func WithFallbackLogger(logger *slog.Logger) ClientLoggerOption {
 	}
 }
 
-// WithClientClock allows overiding the request duration
-// clock for testing.
-func WithClientClock(clock clock.Clock) ClientLoggerOption {
+// WithClientDurationFunc allows overiding the request duration
+// for testing.
+func WithClientDurationFunc(df func(time.Time) time.Duration) ClientLoggerOption {
 	return func(lrt *logRountTripper) {
-		lrt.clock = clock
+		lrt.duration = df
 	}
 }
 
@@ -61,7 +61,7 @@ func WithClientResponseAttr(responseToAttr func(*http.Response) slog.Attr) Clien
 func EnableHTTPClient(c *http.Client, opts ...ClientLoggerOption) {
 	lrt := &logRountTripper{
 		next:      c.Transport,
-		clock:     clock.New(),
+		duration:  time.Since,
 		reqToAttr: requestToAttr,
 		resToAttr: responseToAttr,
 	}
@@ -76,7 +76,7 @@ func EnableHTTPClient(c *http.Client, opts ...ClientLoggerOption) {
 
 type logRountTripper struct {
 	next     http.RoundTripper
-	clock    clock.Clock
+	duration func(time.Time) time.Duration
 	fallback *slog.Logger
 
 	group     string
@@ -90,12 +90,12 @@ func (l *logRountTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	if !ok {
 		return l.next.RoundTrip(req)
 	}
-	start := l.clock.Now()
+	start := time.Now()
 
 	resp, err := l.next.RoundTrip(req)
 	logger = logger.WithGroup(l.group).With(
 		l.reqToAttr(req),
-		slog.Duration("duration", l.clock.Since(start)),
+		slog.Duration("duration", l.duration(start)),
 	)
 	if err != nil {
 		logger.Error("request roundtrip", "error", err)

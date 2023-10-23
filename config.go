@@ -106,6 +106,9 @@ func (c *Config) parseFormatter() error {
 	return nil
 }
 
+// Slog constructs a slog.Logger with the Formatter and Level from config.
+//
+// EXPERIMENTAL: Will change to log/slog import after we drop support for Go 1.20
 func (c *Config) Slog() *slog.Logger {
 	logger := slog.Default()
 
@@ -125,9 +128,9 @@ func (c *Config) Slog() *slog.Logger {
 	case FormatterJSON:
 		return slog.New(slog.NewJSONHandler(os.Stderr, opts))
 	case "":
-		logger.Warn("slog: no format in config, using text handler")
+		logger.Warn("no slog format in config, using text handler")
 	default:
-		logger.Warn("slog: unknown format in config, using text handler", "format", c.Formatter.Format)
+		logger.Warn("unknown slog format in config, using text handler", "format", c.Formatter.Format)
 	}
 	return slog.New(slog.NewTextHandler(os.Stderr, opts))
 }

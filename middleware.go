@@ -36,7 +36,7 @@ func WithIDFunc(nextID func() slog.Attr) MiddlewareOption {
 	}
 }
 
-// WithDurationFunc allows overiding the request duration for testing.
+// WithDurationFunc allows overriding the request duration for testing.
 func WithDurationFunc(df func(time.Time) time.Duration) MiddlewareOption {
 	return func(m *middleware) {
 		m.duration = df

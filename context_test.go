@@ -4,8 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"log/slog"
+
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/exp/slog"
 )
 
 func TestContext(t *testing.T) {

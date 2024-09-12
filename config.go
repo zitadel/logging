@@ -78,11 +78,6 @@ func (c *Config) setGlobal() {
 	logrus.SetFormatter(log.Formatter)
 	logrus.SetLevel(log.Level)
 	logrus.SetReportCaller(log.ReportCaller)
-	for _, leveledHook := range log.Hooks {
-		for _, hook := range leveledHook {
-			logrus.AddHook(hook)
-		}
-	}
 	log = (*logger)(logrus.StandardLogger())
 }
 

@@ -68,14 +68,6 @@ func WithExclude(filter FilterFunc) Option {
 	}
 }
 
-// WithContextAttributesFunc is used to extract attributes from an entries context.
-// The passed context is nil if WithContext was never called on the log entry
-func WithContextAttributesFunc(f ContextAttributesFunc) Option {
-	return func(hook *GcpLoggingExporterHook) {
-		hook.contextAttributes = f
-	}
-}
-
 var _ FilterFunc = MatchAllLogs
 
 func MatchAllLogs(*logrus.Entry) bool { return true }
@@ -84,19 +76,13 @@ var _ FilterFunc = MatchAllLogs
 
 func MatchNoLogs(*logrus.Entry) bool { return false }
 
-// MatchLogsWithContextKeyFunc returns a FilterFunc that only matches entries
-// that have a context with a non-nil value at a certain key
-func MatchLogsWithContextKey(key any) FilterFunc {
-	return func(entry *logrus.Entry) bool {
-		return entry.Context != nil && entry.Context.Value(key) != nil
-	}
-}
-
 func NewGCPLoggingExporterHook(options ...Option) (*GcpLoggingExporterHook, error) {
 	factory := googlecloudexporter.NewFactory()
 	cfg := factory.CreateDefaultConfig()
 	exporterCfg := cfg.(*googlecloudexporter.Config)
 	exporterCfg.LogConfig.DefaultLogName = "default"
+	exporterCfg.QueueSize = 10
+	exporterCfg.NumConsumers = 1
 	zapLogger, err := zap.NewProduction()
 	if err != nil {
 		return nil, err
@@ -124,6 +110,9 @@ func NewGCPLoggingExporterHook(options ...Option) (*GcpLoggingExporterHook, erro
 	if hook.exporterCfg.Validate() != nil {
 		return nil, err
 	}
+	if hook.exporterCfg.QueueSettings.Validate() != nil {
+		return nil, err
+	}
 	return hook, nil
 }
 
@@ -135,7 +124,7 @@ func (o *GcpLoggingExporterHook) Start() error {
 	if err = exporter.Start(context.Background(), nil); err != nil {
 		return err
 	}
-	logProvider := sdklog.NewLoggerProvider(sdklog.WithProcessor(sdklog.NewBatchProcessor(&exporterWrapper{exporter, o.zapLogger})))
+	logProvider := sdklog.NewLoggerProvider(sdklog.WithProcessor(sdklog.NewBatchProcessor(&exporterWrapper{zapLogger: o.zapLogger, Logs: exporter})))
 	o.logger = logProvider.Logger("hook")
 	return nil
 }

@@ -20,17 +20,14 @@ import (
 
 type FilterFunc func(entry *logrus.Entry) bool
 
-type ContextAttributesFunc func(ctx context.Context) Attributes
-
 type GcpLoggingExporterHook struct {
-	logger            otellog.Logger
-	levels            []logrus.Level
-	factory           otelexporter.Factory
-	exporterCfg       *googlecloudexporter.Config
-	otelSettings      *otelexporter.Settings
-	include, exclude  FilterFunc
-	contextAttributes ContextAttributesFunc
-	zapLogger         *zap.Logger
+	logger           otellog.Logger
+	levels           []logrus.Level
+	factory          otelexporter.Factory
+	exporterCfg      *googlecloudexporter.Config
+	otelSettings     *otelexporter.Settings
+	include, exclude FilterFunc
+	zapLogger        *zap.Logger
 }
 
 type Option func(*GcpLoggingExporterHook)
@@ -95,30 +92,6 @@ func MatchLogsWithContextKey(key any) FilterFunc {
 	}
 }
 
-type Attributes []otellog.KeyValue
-
-type Record interface {
-	Attributes() Attributes
-}
-
-// ContextAttributesFromKey returns a ContextAttributesFunc that extracts the value
-// of record interface. If the value is of type Attributes, the attributes are appended to the OTEL log record.
-func ContextAttributesFromKeyFunc(key any) ContextAttributesFunc {
-	return func(ctx context.Context) Attributes {
-		if ctx == nil {
-			return nil
-		}
-		if a, ok := ctx.Value(key).(Record); ok {
-			return a.Attributes()
-		}
-		return nil
-	}
-}
-
-// NoContextAttributes is a ContextAttributesFunc that doesn't extract any attributes from the context.
-// This is the default behavior.
-func NoContextAttributes(context.Context) Attributes { return nil }
-
 func NewGCPLoggingExporterHook(options ...Option) (*GcpLoggingExporterHook, error) {
 	factory := googlecloudexporter.NewFactory()
 	cfg := factory.CreateDefaultConfig()
@@ -137,14 +110,13 @@ func NewGCPLoggingExporterHook(options ...Option) (*GcpLoggingExporterHook, erro
 		},
 	}
 	hook := &GcpLoggingExporterHook{
-		factory:           factory,
-		exporterCfg:       exporterCfg,
-		otelSettings:      settings,
-		levels:            logrus.AllLevels,
-		zapLogger:         zapLogger,
-		include:           MatchAllLogs,
-		exclude:           MatchNoLogs,
-		contextAttributes: NoContextAttributes,
+		factory:      factory,
+		exporterCfg:  exporterCfg,
+		otelSettings: settings,
+		levels:       logrus.AllLevels,
+		zapLogger:    zapLogger,
+		include:      MatchAllLogs,
+		exclude:      MatchNoLogs,
 	}
 	for _, option := range options {
 		option(hook)
@@ -195,7 +167,7 @@ func (o *GcpLoggingExporterHook) Fire(entry *logrus.Entry) error {
 			Value: mapValueToAttributeValue(value),
 		})
 	}
-	r.AddAttributes(append(attrs, o.contextAttributes(entry.Context)...)...)
+	r.AddAttributes(attrs...)
 	o.logger.Emit(context.Background(), *r)
 	return nil
 }
@@ -256,7 +228,8 @@ func (e *exporterWrapper) Export(ctx context.Context, records []sdklog.Record) e
 		logRecord.SetSeverityNumber(plog.SeverityNumber(record.Severity()))
 		logRecordAttributes := logRecord.Attributes()
 		record.WalkAttributes(func(kv otellog.KeyValue) bool {
-			return mapAttributes(kv, logRecordAttributes)
+			logRecordAttributes.PutStr(kv.Key, kv.Value.String())
+			return true
 		})
 	}
 	return e.ConsumeLogs(ctx, ld)
@@ -264,32 +237,4 @@ func (e *exporterWrapper) Export(ctx context.Context, records []sdklog.Record) e
 
 func (e *exporterWrapper) ForceFlush(context.Context) error {
 	return fmt.Errorf("not implemented")
-}
-
-func mapAttributes(kv otellog.KeyValue, into pcommon.Map) bool {
-	switch kv.Value.Kind() {
-	case otellog.KindString:
-		into.PutStr(kv.Key, kv.Value.AsString())
-	case otellog.KindInt64:
-		into.PutInt(kv.Key, kv.Value.AsInt64())
-	case otellog.KindBool:
-		into.PutBool(kv.Key, kv.Value.AsBool())
-	case otellog.KindFloat64:
-		into.PutDouble(kv.Key, kv.Value.AsFloat64())
-	case otellog.KindMap:
-		into.PutEmptyMap(kv.Key)
-		intoMap, ok := into.Get(kv.Key)
-		if !ok {
-			return false
-		}
-		fromMap := kv.Value.AsMap()
-		for _, subKv := range fromMap {
-			if !mapAttributes(subKv, intoMap.Map()) {
-				return false
-			}
-		}
-	default:
-		return false
-	}
-	return true
 }

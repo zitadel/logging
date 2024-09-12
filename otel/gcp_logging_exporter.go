@@ -20,17 +20,18 @@ import (
 
 type FilterFunc func(entry *logrus.Entry) bool
 
-type AddAttributesFunc func() []otellog.KeyValue
+type MapBodyFunc func(entry *logrus.Entry) string
 
 type GcpLoggingExporterHook struct {
 	logger           otellog.Logger
+	zapLogger        *zap.Logger
 	levels           []logrus.Level
 	factory          otelexporter.Factory
 	exporterCfg      *googlecloudexporter.Config
 	otelSettings     *otelexporter.Settings
 	include, exclude FilterFunc
 	add              []otellog.KeyValue
-	zapLogger        *zap.Logger
+	mapBody          MapBodyFunc
 }
 
 type Option func(*GcpLoggingExporterHook)
@@ -78,6 +79,12 @@ func WithAddedAttributes(attributes []otellog.KeyValue) Option {
 	}
 }
 
+func WithMapBody(mapBody MapBodyFunc) Option {
+	return func(hook *GcpLoggingExporterHook) {
+		hook.mapBody = mapBody
+	}
+}
+
 var _ FilterFunc = MatchAllLogs
 
 func MatchAllLogs(*logrus.Entry) bool { return true }
@@ -85,6 +92,14 @@ func MatchAllLogs(*logrus.Entry) bool { return true }
 var _ FilterFunc = MatchAllLogs
 
 func MatchNoLogs(*logrus.Entry) bool { return false }
+
+var _ MapBodyFunc = MapMessageToBody
+
+// MapMessageToBody maps logrus entry message to otel log body
+// This is the default mapping function
+func MapMessageToBody(entry *logrus.Entry) string {
+	return entry.Message
+}
 
 func NewGCPLoggingExporterHook(options ...Option) (*GcpLoggingExporterHook, error) {
 	factory := googlecloudexporter.NewFactory()
@@ -113,6 +128,7 @@ func NewGCPLoggingExporterHook(options ...Option) (*GcpLoggingExporterHook, erro
 		zapLogger:    zapLogger,
 		include:      MatchAllLogs,
 		exclude:      MatchNoLogs,
+		mapBody:      MapMessageToBody,
 	}
 	for _, option := range options {
 		option(hook)
@@ -151,7 +167,7 @@ func (o *GcpLoggingExporterHook) Fire(entry *logrus.Entry) error {
 		return nil
 	}
 	r := &otellog.Record{}
-	r.SetBody(otellog.StringValue(entry.Message))
+	r.SetBody(otellog.StringValue(o.mapBody(entry)))
 	r.SetTimestamp(time.Now())
 	r.SetSeverity(mapLogrusLevelToSeverity(entry.Level))
 	r.SetObservedTimestamp(entry.Time)

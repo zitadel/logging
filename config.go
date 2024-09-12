@@ -10,10 +10,11 @@ import (
 )
 
 type Config struct {
-	Level       string    `json:"level"`
-	Formatter   formatter `json:"formatter"`
-	LocalLogger bool      `json:"localLogger"`
-	AddSource   bool      `json:"addSource"`
+	Level             string    `json:"level"`
+	Formatter         formatter `json:"formatter"`
+	LocalLogger       bool      `json:"localLogger"`
+	AddSource         bool      `json:"addSource"`
+	programmaticHooks []logrus.Hook
 }
 
 type formatter struct {
@@ -41,7 +42,12 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	return c.SetLogger()
 }
 
-func (c *Config) SetLogger() (err error) {
+type Option func(*Config)
+
+func (c *Config) SetLogger(options ...Option) (err error) {
+	for _, option := range options {
+		option(c)
+	}
 	err = c.parseFormatter()
 	if err != nil {
 		return err
@@ -54,8 +60,15 @@ func (c *Config) SetLogger() (err error) {
 	if err != nil {
 		return err
 	}
+	c.addHooks()
 	c.setGlobal()
 	return nil
+}
+
+func AddHooks(hook ...logrus.Hook) Option {
+	return func(c *Config) {
+		c.programmaticHooks = append(c.programmaticHooks, hook...)
+	}
 }
 
 func (c *Config) setGlobal() {
@@ -65,6 +78,11 @@ func (c *Config) setGlobal() {
 	logrus.SetFormatter(log.Formatter)
 	logrus.SetLevel(log.Level)
 	logrus.SetReportCaller(log.ReportCaller)
+	for _, leveledHook := range log.Hooks {
+		for _, hook := range leveledHook {
+			logrus.AddHook(hook)
+		}
+	}
 	log = (*logger)(logrus.StandardLogger())
 }
 
@@ -74,6 +92,16 @@ func (c *Config) unmarshalFormatter() error {
 		return err
 	}
 	return json.Unmarshal(formatterData, log.Formatter)
+}
+
+const (
+	HookEffectOtel = "otel-to-google-cloud-logging"
+)
+
+func (c *Config) addHooks() {
+	for _, hook := range c.programmaticHooks {
+		log.Hooks.Add(hook)
+	}
 }
 
 func (c *Config) parseLevel() error {

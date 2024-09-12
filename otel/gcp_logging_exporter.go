@@ -36,19 +36,19 @@ type GcpLoggingExporterHook struct {
 
 type Option func(*GcpLoggingExporterHook)
 
-func WithChangedDefaultExporterConfig(changeDefaults func(*googlecloudexporter.Config)) Option {
+func WithExporterConfig(changeDefaults func(*googlecloudexporter.Config)) Option {
 	return func(g *GcpLoggingExporterHook) {
 		changeDefaults(g.exporterCfg)
 	}
 }
 
-func WithChangedDefaultOtelSettings(changeDefaults func(*otelexporter.Settings)) Option {
+func OtelSettings(changeDefaults func(*otelexporter.Settings)) Option {
 	return func(g *GcpLoggingExporterHook) {
 		changeDefaults(g.otelSettings)
 	}
 }
 
-func WithChangedLevels(levels []logrus.Level) Option {
+func WithLevels(levels []logrus.Level) Option {
 	return func(g *GcpLoggingExporterHook) {
 		g.levels = levels
 	}
@@ -72,8 +72,8 @@ func WithExclude(filter FilterFunc) Option {
 	}
 }
 
-// WithAddedAttributes adds attributes to every log entry
-func WithAddedAttributes(attributes []otellog.KeyValue) Option {
+// WithAttributes adds attributes to every log entry
+func WithAttributes(attributes []otellog.KeyValue) Option {
 	return func(hook *GcpLoggingExporterHook) {
 		hook.add = attributes
 	}

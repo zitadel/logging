@@ -20,6 +20,8 @@ import (
 
 type FilterFunc func(entry *logrus.Entry) bool
 
+type AddAttributesFunc func() []otellog.KeyValue
+
 type GcpLoggingExporterHook struct {
 	logger           otellog.Logger
 	levels           []logrus.Level
@@ -27,6 +29,7 @@ type GcpLoggingExporterHook struct {
 	exporterCfg      *googlecloudexporter.Config
 	otelSettings     *otelexporter.Settings
 	include, exclude FilterFunc
+	add              []otellog.KeyValue
 	zapLogger        *zap.Logger
 }
 
@@ -65,6 +68,13 @@ func WithInclude(filter FilterFunc) Option {
 func WithExclude(filter FilterFunc) Option {
 	return func(hook *GcpLoggingExporterHook) {
 		hook.exclude = filter
+	}
+}
+
+// WithAddedAttributes adds attributes to every log entry
+func WithAddedAttributes(attributes []otellog.KeyValue) Option {
+	return func(hook *GcpLoggingExporterHook) {
+		hook.add = attributes
 	}
 }
 
@@ -156,6 +166,7 @@ func (o *GcpLoggingExporterHook) Fire(entry *logrus.Entry) error {
 			Value: mapValueToAttributeValue(value),
 		})
 	}
+	attrs = append(attrs, o.add...)
 	r.AddAttributes(attrs...)
 	o.logger.Emit(context.Background(), *r)
 	return nil

@@ -42,7 +42,7 @@ func WithExporterConfig(changeDefaults func(*googlecloudexporter.Config)) Option
 	}
 }
 
-func OtelSettings(changeDefaults func(*otelexporter.Settings)) Option {
+func WithOtelSettings(changeDefaults func(*otelexporter.Settings)) Option {
 	return func(g *GcpLoggingExporterHook) {
 		changeDefaults(g.otelSettings)
 	}

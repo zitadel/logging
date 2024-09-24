@@ -3,6 +3,7 @@ package otel
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/googlecloudexporter"
@@ -42,12 +43,15 @@ func WithExporterConfig(changeDefaults func(*googlecloudexporter.Config)) Option
 	}
 }
 
+// WithOtelSettings allows to change the default otel settings
 func WithOtelSettings(changeDefaults func(*otelexporter.Settings)) Option {
 	return func(g *GcpLoggingExporterHook) {
 		changeDefaults(g.otelSettings)
 	}
 }
 
+// WithLevels allows to change the default logrus levels that are exported
+// By default, all levels are exported
 func WithLevels(levels []logrus.Level) Option {
 	return func(g *GcpLoggingExporterHook) {
 		g.levels = levels
@@ -79,6 +83,8 @@ func WithAttributes(attributes []otellog.KeyValue) Option {
 	}
 }
 
+// WithMapBody allows to change the default mapping function
+// By default, MapMessageToBody is used
 func WithMapBody(mapBody MapBodyFunc) Option {
 	return func(hook *GcpLoggingExporterHook) {
 		hook.mapBody = mapBody
@@ -96,12 +102,81 @@ func MatchNoLogs(*logrus.Entry) bool { return false }
 var _ MapBodyFunc = MapMessageToBody
 
 // MapMessageToBody maps logrus entry message to otel log body
-// This is the default mapping function
 func MapMessageToBody(entry *logrus.Entry) string {
 	return entry.Message
 }
 
-func NewGCPLoggingExporterHook(options ...Option) (*GcpLoggingExporterHook, error) {
+// MapFieldsToBody maps logrus entry fields to otel log body
+// This is the default mapping function
+func MapFieldsToBody(entry *logrus.Entry) string {
+	entryCopy := *entry
+	lg := logrus.New()
+	lg.Formatter = &logrus.TextFormatter{
+		DisableColors:    true,
+		DisableQuote:     true,
+		DisableTimestamp: true,
+		PadLevelText:     true,
+		QuoteEmptyFields: true,
+	}
+	entryCopy.Logger = lg
+	body, err := entryCopy.String()
+	if err != nil {
+		return fmt.Sprintf("Failed to format log entry: %v, original message: %s", err, entry.Message)
+	}
+	return strings.TrimSpace(body)
+}
+
+/*
+NewGCPLoggingExporterHook creates a new GCPLoggingExporterHook. This hook can be used for exporting logs created with logrus to Google Cloud Logging. The logs are also still printed to stdout.
+- projectID is the GCP project ID
+- options are used to change the default settings
+
+The hook is not started automatically, Start() must be called to start the hook.
+
+Example usage:
+
+```go
+logger := logrus.New()
+hook, err := NewGCPLoggingExporterHook(
+
+	"your-gcp-project-id",
+	WithExporterConfig(func(cfg *googlecloudexporter.Config) {
+		cfg.LogConfig.DefaultLogName = "zitadel"
+		cfg.LogConfig.ServiceResourceLabels = false
+	    cfg.QueueSize = 20
+	}),
+	WithOtelSettings(func(settings *otelexporter.Settings) {
+	    settings.ID = component.MustNewID("custom-id")
+	}),
+	WithLevels([]logrus.Level{logrus.InfoLevel, logrus.ErrorLevel}),
+	WithInclude(func(entry *logrus.Entry) bool {
+	    return entry.Data["stream"] == "activity"
+	}),
+	WithExclude(func(entry *logrus.Entry) bool {
+	    return entry.Message == "Exclude this message"
+	}),
+	WithAttributes([]otellog.KeyValue{
+	    otellog.String("key1", "value1"),
+	    otellog.String("key2", "value2"),
+	}),
+	WithMapBody(MapMessageToBody),
+
+)
+
+	if err != nil {
+		log.Fatalf("Failed to create GCPLoggingExporterHook: %v", err)
+	}
+
+err = hook.Start()
+
+	if err != nil {
+		log.Fatalf("Failed to start GCPLoggingExporterHook: %v", err)
+	}
+
+logger.AddHook(hook)
+```
+*/
+func NewGCPLoggingExporterHook(projectID string, options ...Option) (*GcpLoggingExporterHook, error) {
 	factory := googlecloudexporter.NewFactory()
 	cfg := factory.CreateDefaultConfig()
 	exporterCfg := cfg.(*googlecloudexporter.Config)
@@ -128,15 +203,16 @@ func NewGCPLoggingExporterHook(options ...Option) (*GcpLoggingExporterHook, erro
 		zapLogger:    zapLogger,
 		include:      MatchAllLogs,
 		exclude:      MatchNoLogs,
-		mapBody:      MapMessageToBody,
+		mapBody:      MapFieldsToBody,
 	}
 	for _, option := range options {
 		option(hook)
 	}
-	if hook.exporterCfg.Validate() != nil {
+	hook.exporterCfg.ProjectID = projectID
+	if err = hook.exporterCfg.Validate(); err != nil {
 		return nil, err
 	}
-	if hook.exporterCfg.QueueSettings.Validate() != nil {
+	if err = hook.exporterCfg.QueueSettings.Validate(); err != nil {
 		return nil, err
 	}
 	return hook, nil
@@ -226,12 +302,20 @@ func mapLogrusLevelToSeverity(level logrus.Level) otellog.Severity {
 
 var _ sdklog.Exporter = (*exporterWrapper)(nil)
 
+type Logs interface {
+	ConsumeLogs(ctx context.Context, ld plog.Logs) error
+	Shutdown(ctx context.Context) error
+}
+
 type exporterWrapper struct {
-	otelexporter.Logs
+	Logs
 	zapLogger *zap.Logger
 }
 
 func (e *exporterWrapper) Export(ctx context.Context, records []sdklog.Record) error {
+	if len(records) == 0 {
+		return nil
+	}
 	ld := plog.NewLogs()
 	logResourceLogs := ld.ResourceLogs().AppendEmpty()
 	scopeLogs := logResourceLogs.ScopeLogs().AppendEmpty()

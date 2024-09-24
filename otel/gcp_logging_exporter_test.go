@@ -3,6 +3,7 @@ package otel
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/googlecloudexporter"
@@ -16,6 +17,7 @@ import (
 )
 
 func TestNewGCPLoggingExporterHook_InvalidConfig(t *testing.T) {
+	require.NoError(t, os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "/invalid.json"))
 	testCases := []struct {
 		name      string
 		config    func(cfg *googlecloudexporter.Config)
@@ -60,6 +62,7 @@ func TestNewGCPLoggingExporterHook_InvalidConfig(t *testing.T) {
 }
 
 func TestGcpLoggingExporterHook_Fire_DifferentLevels(t *testing.T) {
+	require.NoError(t, os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "/invalid.json"))
 	hook, err := NewGCPLoggingExporterHook("test-project")
 	require.NoError(t, err)
 	require.NoError(t, hook.Start())
@@ -75,6 +78,7 @@ func TestGcpLoggingExporterHook_Fire_DifferentLevels(t *testing.T) {
 }
 
 func TestGcpLoggingExporterHook_Fire_NotStarted(t *testing.T) {
+	require.NoError(t, os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "/invalid.json"))
 	hook, err := NewGCPLoggingExporterHook("test-project")
 	require.NoError(t, err)
 	entry := &logrus.Entry{
@@ -85,6 +89,7 @@ func TestGcpLoggingExporterHook_Fire_NotStarted(t *testing.T) {
 }
 
 func TestGcpLoggingExporterHook_Fire_IncludeExclude(t *testing.T) {
+	require.NoError(t, os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "/invalid.json"))
 	hook, err := NewGCPLoggingExporterHook(
 		"test-project",
 		WithInclude(func(entry *logrus.Entry) bool { return entry.Level == logrus.InfoLevel }),
@@ -117,6 +122,7 @@ func (m *MockLogs) Shutdown(context.Context) error {
 }
 
 func TestExporterWrapper_Export(t *testing.T) {
+	require.NoError(t, os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "/invalid.json"))
 	createLogRecord := func(body string, attributes map[string]string, severity log.Severity) sdklog.Record {
 		record := sdklog.Record{}
 		record.SetBody(log.StringValue(body))

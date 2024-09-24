@@ -131,6 +131,8 @@ NewGCPLoggingExporterHook creates a new GCPLoggingExporterHook. This hook can be
 - projectID is the GCP project ID
 - options are used to change the default settings
 
+Make sure the runtime has Google Application Default Credentials set up.
+
 The hook is not started automatically, Start() must be called to start the hook.
 
 Example usage:

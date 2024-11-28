@@ -2,8 +2,10 @@ package logging
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"runtime"
 	"strings"
 	"time"
@@ -53,10 +55,7 @@ func WithFields(fields ...interface{}) *Entry {
 
 // OnError sets the error. The log will only be printed if err is not nil
 func (e *Entry) OnError(err error) *Entry {
-	e.err = err
-	if err != nil {
-		e.attributes = append(e.attributes, slog.Any("err", err))
-	}
+	e.WithError(err)
 	e.isOnError = true
 	return e
 }
@@ -81,9 +80,15 @@ func (e *Entry) WithFields(fields map[string]interface{}) *Entry {
 
 func (e *Entry) WithError(err error) *Entry {
 	e.err = err
-	if err != nil {
-		e.attributes = append(e.attributes, slog.Any("err", err))
+	if err == nil {
+		return e
 	}
+	for _, attr := range e.attributes {
+		if a, ok := attr.(slog.Attr); ok && a.Key == "err" {
+			return e
+		}
+	}
+	e.attributes = append(e.attributes, slog.Any("err", err))
 	return e
 }
 
@@ -229,7 +234,7 @@ func (e *Entry) Warningf(format string, args ...interface{}) {
 }
 
 func Error(args ...interface{}) {
-	New().Error(args...)
+	Errorln(args...)
 }
 
 func (e *Entry) Error(args ...interface{}) {
@@ -314,7 +319,7 @@ func (e *Entry) Errorf(format string, args ...interface{}) {
 }
 
 func Fatal(args ...interface{}) {
-	New().Fatal(args...)
+	Fatalln(args...)
 }
 
 func (e *Entry) Fatal(args ...interface{}) {
@@ -327,7 +332,10 @@ func Fatalln(args ...interface{}) {
 
 func (e *Entry) Fatalln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
-	e.log(func() { slog.Log(context.Background(), 12, msg, append(e.attributes, attrs...)...) })
+	e.log(func() {
+		slog.New(customErrorFormatter{next: slog.Default().Handler()}).Log(context.Background(), 12, msg, append(e.WithError(errors.New(msg)).attributes, attrs...)...)
+		os.Exit(1)
+	})
 }
 
 func Fatalf(format string, args ...interface{}) {
@@ -335,23 +343,32 @@ func Fatalf(format string, args ...interface{}) {
 }
 
 func (e *Entry) Fatalf(format string, args ...interface{}) {
-	e.log(func() { slog.Log(context.Background(), 12, slogArgsf(format, args...), e.attributes...) })
+	msg := slogArgsf(format, args...)
+	e.log(func() {
+		slog.New(customErrorFormatter{next: slog.Default().Handler()}).Log(context.Background(), 12, msg, e.WithError(errors.New(msg)).attributes...)
+		os.Exit(1)
+	})
 }
 
 func Panic(args ...interface{}) {
-	Fatal(args...)
+	Panicln(args...)
 }
 
 func (e *Entry) Panic(args ...interface{}) {
-	e.Fatal(args...)
+	e.Panicln(args...)
 }
 
 func Panicln(args ...interface{}) {
-	Fatalln(args...)
+	New().Panicln(args...)
 }
 
 func (e *Entry) Panicln(args ...interface{}) {
-	e.Fatalln(args...)
+	msg, attrs := slogArgs(args)
+	e.log(func() {
+		e.WithError(errors.New(msg))
+		slog.New(customErrorFormatter{next: slog.Default().Handler()}).Log(context.Background(), 16, msg, append(e.WithError(errors.New(msg)).attributes, attrs...)...)
+		panic(msg)
+	})
 }
 
 func Panicf(format string, args ...interface{}) {
@@ -359,7 +376,11 @@ func Panicf(format string, args ...interface{}) {
 }
 
 func (e *Entry) Panicf(format string, args ...interface{}) {
-	e.Fatalf(format, args...)
+	msg := slogArgsf(format, args...)
+	e.log(func() {
+		slog.New(customErrorFormatter{next: slog.Default().Handler()}).Log(context.Background(), 16, msg, e.WithError(errors.New(msg)).attributes...)
+		panic(msg)
+	})
 }
 
 func (e *Entry) log(log func()) {

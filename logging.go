@@ -126,7 +126,7 @@ func Debugln(args ...interface{}) {
 func (e *Entry) Debugln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
 	e.log(func() {
-		slog.New(cloudLoggingHandler{next: slog.Default().Handler()}).Debug(msg, append(e.attributes, attrs...)...)
+		slog.New(NewCloudLoggingHandler(nil)).Debug(msg, append(e.attributes, attrs...)...)
 	})
 }
 
@@ -136,7 +136,7 @@ func Debugf(format string, args ...interface{}) {
 
 func (e *Entry) Debugf(format string, args ...interface{}) {
 	e.log(func() {
-		slog.New(cloudLoggingHandler{next: slog.Default().Handler()}).Debug(slogArgsf(format, args...), e.attributes...)
+		slog.New(NewCloudLoggingHandler(nil)).Debug(slogArgsf(format, args...), e.attributes...)
 	})
 }
 
@@ -155,7 +155,7 @@ func Infoln(args ...interface{}) {
 func (e *Entry) Infoln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
 	e.log(func() {
-		slog.New(cloudLoggingHandler{next: slog.Default().Handler()}).Info(msg, append(e.attributes, attrs...)...)
+		slog.New(NewCloudLoggingHandler(nil)).Info(msg, append(e.attributes, attrs...)...)
 	})
 }
 
@@ -165,7 +165,7 @@ func Infof(format string, args ...interface{}) {
 
 func (e *Entry) Infof(format string, args ...interface{}) {
 	e.log(func() {
-		slog.New(cloudLoggingHandler{next: slog.Default().Handler()}).Info(slogArgsf(format, args...), e.attributes...)
+		slog.New(NewCloudLoggingHandler(nil)).Info(slogArgsf(format, args...), e.attributes...)
 	})
 }
 
@@ -184,7 +184,7 @@ func Traceln(args ...interface{}) {
 func (e *Entry) Traceln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
 	e.log(func() {
-		slog.New(cloudLoggingHandler{next: slog.Default().Handler()}).Log(context.Background(), -8, msg, append(e.attributes, attrs...)...)
+		slog.New(NewCloudLoggingHandler(nil)).Log(context.Background(), -8, msg, append(e.attributes, attrs...)...)
 	})
 }
 
@@ -194,7 +194,7 @@ func Tracef(format string, args ...interface{}) {
 
 func (e *Entry) Tracef(format string, args ...interface{}) {
 	e.log(func() {
-		slog.New(cloudLoggingHandler{next: slog.Default().Handler()}).Log(context.Background(), -8, slogArgsf(format, args...), e.attributes...)
+		slog.New(NewCloudLoggingHandler(nil)).Log(context.Background(), -8, slogArgsf(format, args...), e.attributes...)
 	})
 }
 
@@ -213,7 +213,7 @@ func Warnln(args ...interface{}) {
 func (e *Entry) Warnln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
 	e.log(func() {
-		slog.New(cloudLoggingHandler{next: slog.Default().Handler()}).Warn(msg, append(e.attributes, attrs...)...)
+		slog.New(NewCloudLoggingHandler(nil)).Warn(msg, append(e.attributes, attrs...)...)
 	})
 }
 
@@ -223,7 +223,7 @@ func Warnf(format string, args ...interface{}) {
 
 func (e *Entry) Warnf(format string, args ...interface{}) {
 	e.log(func() {
-		slog.New(cloudLoggingHandler{next: slog.Default().Handler()}).Warn(slogArgsf(format, args...), e.attributes...)
+		slog.New(NewCloudLoggingHandler(nil)).Warn(slogArgsf(format, args...), e.attributes...)
 	})
 }
 
@@ -264,27 +264,39 @@ func Errorln(args ...interface{}) {
 }
 
 type cloudLoggingHandler struct {
-	next slog.Handler
+	sc        ServiceContext
+	attrs     []slog.Attr
+	groupAttr *slog.Attr
 }
 
-func (c cloudLoggingHandler) Enabled(context.Context, slog.Level) bool {
+func NewCloudLoggingHandler(optionalSc *ServiceContext) slog.Handler {
+	sc := ServiceContext{}
+	if optionalSc != nil {
+		sc = *optionalSc
+	}
+	return &cloudLoggingHandler{sc: sc}
+}
+
+func (c *cloudLoggingHandler) Enabled(context.Context, slog.Level) bool {
 	return true
 }
 
-type GoogleCloudLoggingRecord struct {
-	Time           string `json:"time"`
-	Message        string `json:"message"`
-	Severity       string `json:"severity,omitempty"`
-	Type           string `json:"@type,omitempty"`
-	StackTrace     string `json:"stack_trace,omitempty"`
-	ServiceContext struct {
-		Service string `json:"service,omitempty"`
-		Version string `json:"version,omitempty"`
-	} `json:"serviceContext,omitempty"`
-	AppContext map[string]any `json:"appContext,omitempty"`
+type ServiceContext struct {
+	Service string `json:"service,omitempty"`
+	Version string `json:"version,omitempty"`
 }
 
-func (c cloudLoggingHandler) Handle(_ context.Context, record slog.Record) error {
+type GoogleCloudLoggingRecord struct {
+	Time           string         `json:"time"`
+	Message        string         `json:"message"`
+	Severity       string         `json:"severity,omitempty"`
+	Type           string         `json:"@type,omitempty"`
+	StackTrace     string         `json:"stack_trace,omitempty"`
+	ServiceContext ServiceContext `json:"serviceContext,omitempty"`
+	AppContext     map[string]any `json:"appContext,omitempty"`
+}
+
+func (c *cloudLoggingHandler) Handle(_ context.Context, record slog.Record) error {
 	gcpLoggingRecord := GoogleCloudLoggingRecord{
 		Time:     record.Time.Format(time.RFC3339),
 		Message:  record.Message,
@@ -318,18 +330,37 @@ func (c cloudLoggingHandler) Handle(_ context.Context, record slog.Record) error
 	return err
 }
 
-func (c cloudLoggingHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	return cloudLoggingHandler{c.next.WithAttrs(attrs)}
+func (c *cloudLoggingHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	newHandler := c.copy()
+	if newHandler.groupAttr == nil {
+		newHandler.attrs = append(newHandler.attrs, attrs...)
+		return newHandler
+	}
+	newHandler.groupAttr.Value = slog.GroupValue(append(newHandler.groupAttr.Value.Group(), attrs...)...)
+	return newHandler
 }
 
-func (c cloudLoggingHandler) WithGroup(name string) slog.Handler {
-	return cloudLoggingHandler{c.next.WithGroup(name)}
+func (c *cloudLoggingHandler) WithGroup(name string) slog.Handler {
+	newHandler := c.copy()
+	newGroupAttr := slog.Group(name)
+	newHandler.groupAttr = &newGroupAttr
+	newHandler.attrs = append(newHandler.attrs, newGroupAttr)
+	return newHandler
+}
+
+func (c *cloudLoggingHandler) copy() *cloudLoggingHandler {
+	return &cloudLoggingHandler{
+		sc:        c.sc,
+		groupAttr: c.groupAttr,
+		// We create a new attrs slice so the old one is not modified
+		attrs: append([]slog.Attr{}, c.attrs...),
+	}
 }
 
 func (e *Entry) Errorln(args ...interface{}) {
 	e.log(func() {
 		msg, attrs := slogArgs(args)
-		slog.New(cloudLoggingHandler{next: slog.Default().Handler()}).Error(msg, append(e.attributes, attrs...)...)
+		slog.New(NewCloudLoggingHandler(nil)).Error(msg, append(e.attributes, attrs...)...)
 	})
 }
 
@@ -356,7 +387,7 @@ func Fatalln(args ...interface{}) {
 func (e *Entry) Fatalln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
 	e.log(func() {
-		slog.New(cloudLoggingHandler{next: slog.Default().Handler()}).Log(context.Background(), 12, msg, append(e.WithError(errors.New(msg)).attributes, attrs...)...)
+		slog.New(NewCloudLoggingHandler(nil)).Log(context.Background(), 12, msg, append(e.WithError(errors.New(msg)).attributes, attrs...)...)
 		os.Exit(1)
 	})
 }
@@ -368,7 +399,7 @@ func Fatalf(format string, args ...interface{}) {
 func (e *Entry) Fatalf(format string, args ...interface{}) {
 	msg := slogArgsf(format, args...)
 	e.log(func() {
-		slog.New(cloudLoggingHandler{next: slog.Default().Handler()}).Log(context.Background(), 12, msg, e.WithError(errors.New(msg)).attributes...)
+		slog.New(NewCloudLoggingHandler(nil)).Log(context.Background(), 12, msg, e.WithError(errors.New(msg)).attributes...)
 		os.Exit(1)
 	})
 }
@@ -389,7 +420,7 @@ func (e *Entry) Panicln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
 	e.log(func() {
 		e.WithError(errors.New(msg))
-		slog.New(cloudLoggingHandler{next: slog.Default().Handler()}).Log(context.Background(), 16, msg, append(e.WithError(errors.New(msg)).attributes, attrs...)...)
+		slog.New(NewCloudLoggingHandler(nil)).Log(context.Background(), 16, msg, append(e.WithError(errors.New(msg)).attributes, attrs...)...)
 		panic(msg)
 	})
 }
@@ -401,7 +432,7 @@ func Panicf(format string, args ...interface{}) {
 func (e *Entry) Panicf(format string, args ...interface{}) {
 	msg := slogArgsf(format, args...)
 	e.log(func() {
-		slog.New(cloudLoggingHandler{next: slog.Default().Handler()}).Log(context.Background(), 16, msg, e.WithError(errors.New(msg)).attributes...)
+		slog.New(NewCloudLoggingHandler(nil)).Log(context.Background(), 16, msg, e.WithError(errors.New(msg)).attributes...)
 		panic(msg)
 	})
 }

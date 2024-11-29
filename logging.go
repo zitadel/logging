@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"time"
 )
@@ -281,10 +282,12 @@ func (c customErrorFormatter) Handle(ctx context.Context, record slog.Record) er
 			errField = attr.Value.String()
 			newAttrs = append(newAttrs,
 				slog.String("@type", "type.googleapis.com/google.devtools.clouderrorreporting.v1beta1.ReportedErrorEvent"),
-				slog.String("stack_trace", generateStackTrace(record.PC, 3)),
+				slog.String("stack_trace", string(debug.Stack())),
 			)
 		case "level":
 			newAttrs = append(newAttrs, slog.String("severity", strings.ToUpper(attr.Value.String())))
+		case "msg":
+			// filter
 		default:
 			newAttrs = append(newAttrs, attr)
 		}
@@ -295,26 +298,9 @@ func (c customErrorFormatter) Handle(ctx context.Context, record slog.Record) er
 		msg = fmt.Sprintf("%s: %s", record.Message, errField)
 	}
 	newAttrs = append(newAttrs, slog.String("message", msg))
-	newRecord := slog.NewRecord(record.Time, record.Level, record.Message, record.PC)
+	newRecord := slog.NewRecord(record.Time, record.Level, "", record.PC)
 	newRecord.AddAttrs(newAttrs...)
 	return c.next.Handle(ctx, newRecord)
-}
-
-func generateStackTrace(pc uintptr, skip int) string {
-	var stack []string
-	if fn := runtime.FuncForPC(pc); fn != nil {
-		file, line := fn.FileLine(pc)
-		stack = append(stack, fmt.Sprintf("%s:%d %s", file, line, fn.Name()))
-	}
-	for i := skip; ; i++ {
-		pc, file, line, ok := runtime.Caller(i)
-		if !ok {
-			break
-		}
-		fn := runtime.FuncForPC(pc)
-		stack = append(stack, fmt.Sprintf("%s:%d %s", file, line, fn.Name()))
-	}
-	return strings.Join(stack, "\n")
 }
 
 func (c customErrorFormatter) WithAttrs(attrs []slog.Attr) slog.Handler {

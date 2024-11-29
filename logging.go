@@ -271,35 +271,42 @@ func (c cloudLoggingHandler) Enabled(context.Context, slog.Level) bool {
 	return true
 }
 
-func (c cloudLoggingHandler) Handle(ctx context.Context, record slog.Record) error {
-	newAttrs := []slog.Attr{
-		slog.String("severity", strings.ToUpper(record.Level.String())),
-		slog.String("time", record.Time.Format(time.RFC3339)),
+type GoogleCloudLoggingRecord struct {
+	Time           string `json:"time"`
+	Message        string `json:"message"`
+	Severity       string `json:"severity,omitempty"`
+	Type           string `json:"@type,omitempty"`
+	StackTrace     string `json:"stack_trace,omitempty"`
+	ServiceContext struct {
+		Service string `json:"service,omitempty"`
+		Version string `json:"version,omitempty"`
+	} `json:"serviceContext,omitempty"`
+	AppContext map[string]any `json:"appContext,omitempty"`
+}
+
+func (c cloudLoggingHandler) Handle(_ context.Context, record slog.Record) error {
+	gcpLoggingRecord := GoogleCloudLoggingRecord{
+		Time:     record.Time.Format(time.RFC3339),
+		Message:  record.Message,
+		Severity: strings.ToUpper(record.Level.String()),
 	}
-	var errField string
 	record.Attrs(func(attr slog.Attr) bool {
 		switch attr.Key {
 		case "err":
-			errField = attr.Value.String()
-			newAttrs = append(newAttrs,
-				slog.String("@type", "type.googleapis.com/google.devtools.clouderrorreporting.v1beta1.ReportedErrorEvent"),
-				slog.String("stack_trace", string(debug.Stack())),
-			)
+			gcpLoggingRecord.Type = "type.googleapis.com/google.devtools.clouderrorreporting.v1beta1.ReportedErrorEvent"
+			gcpLoggingRecord.StackTrace = string(debug.Stack())
+			gcpLoggingRecord.Message = fmt.Sprintf("%s: %s", record.Message, attr.Value)
 		case "level", "msg":
 			// filter out
 		default:
-			newAttrs = append(newAttrs, attr)
+			if gcpLoggingRecord.AppContext == nil {
+				gcpLoggingRecord.AppContext = make(map[string]any)
+			}
+			gcpLoggingRecord.AppContext[attr.Key] = attr.Value
 		}
 		return true
 	})
-	msg := record.Message
-	if errField != "" {
-		msg = fmt.Sprintf("%s: %s", record.Message, errField)
-	}
-	newAttrs = append(newAttrs, slog.String("message", msg))
-	newRecord := slog.NewRecord(record.Time, record.Level, msg, record.PC)
-	newRecord.AddAttrs(newAttrs...)
-	data, err := json.Marshal(newRecord)
+	data, err := json.Marshal(gcpLoggingRecord)
 	if err != nil {
 		return err
 	}

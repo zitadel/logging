@@ -123,7 +123,9 @@ func Debugln(args ...interface{}) {
 
 func (e *Entry) Debugln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
-	e.log(func() { slog.Debug(msg, append(e.attributes, attrs...)...) })
+	e.log(func() {
+		slog.New(customErrorFormatter{next: slog.Default().Handler()}).Debug(msg, append(e.attributes, attrs...)...)
+	})
 }
 
 func Debugf(format string, args ...interface{}) {
@@ -131,7 +133,9 @@ func Debugf(format string, args ...interface{}) {
 }
 
 func (e *Entry) Debugf(format string, args ...interface{}) {
-	e.log(func() { slog.Debug(slogArgsf(format, args...), e.attributes...) })
+	e.log(func() {
+		slog.New(customErrorFormatter{next: slog.Default().Handler()}).Debug(slogArgsf(format, args...), e.attributes...)
+	})
 }
 
 func Info(args ...interface{}) {
@@ -148,7 +152,9 @@ func Infoln(args ...interface{}) {
 
 func (e *Entry) Infoln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
-	e.log(func() { slog.Info(msg, append(e.attributes, attrs...)...) })
+	e.log(func() {
+		slog.New(customErrorFormatter{next: slog.Default().Handler()}).Info(msg, append(e.attributes, attrs...)...)
+	})
 }
 
 func Infof(format string, args ...interface{}) {
@@ -156,7 +162,9 @@ func Infof(format string, args ...interface{}) {
 }
 
 func (e *Entry) Infof(format string, args ...interface{}) {
-	e.log(func() { slog.Info(slogArgsf(format, args...), e.attributes...) })
+	e.log(func() {
+		slog.New(customErrorFormatter{next: slog.Default().Handler()}).Info(slogArgsf(format, args...), e.attributes...)
+	})
 }
 
 func Trace(args ...interface{}) {
@@ -173,7 +181,9 @@ func Traceln(args ...interface{}) {
 
 func (e *Entry) Traceln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
-	e.log(func() { slog.Log(context.Background(), -8, msg, append(e.attributes, attrs...)...) })
+	e.log(func() {
+		slog.New(customErrorFormatter{next: slog.Default().Handler()}).Log(context.Background(), -8, msg, append(e.attributes, attrs...)...)
+	})
 }
 
 func Tracef(format string, args ...interface{}) {
@@ -181,7 +191,9 @@ func Tracef(format string, args ...interface{}) {
 }
 
 func (e *Entry) Tracef(format string, args ...interface{}) {
-	e.log(func() { slog.Log(context.Background(), -8, slogArgsf(format, args...), e.attributes...) })
+	e.log(func() {
+		slog.New(customErrorFormatter{next: slog.Default().Handler()}).Log(context.Background(), -8, slogArgsf(format, args...), e.attributes...)
+	})
 }
 
 func Warn(args ...interface{}) {
@@ -198,7 +210,9 @@ func Warnln(args ...interface{}) {
 
 func (e *Entry) Warnln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
-	e.log(func() { slog.Warn(msg, append(e.attributes, attrs...)...) })
+	e.log(func() {
+		slog.New(customErrorFormatter{next: slog.Default().Handler()}).Warn(msg, append(e.attributes, attrs...)...)
+	})
 }
 
 func Warnf(format string, args ...interface{}) {
@@ -206,7 +220,9 @@ func Warnf(format string, args ...interface{}) {
 }
 
 func (e *Entry) Warnf(format string, args ...interface{}) {
-	e.log(func() { slog.Warn(slogArgsf(format, args...), e.attributes...) })
+	e.log(func() {
+		slog.New(customErrorFormatter{next: slog.Default().Handler()}).Warn(slogArgsf(format, args...), e.attributes...)
+	})
 }
 
 func Warning(args ...interface{}) {
@@ -249,32 +265,38 @@ type customErrorFormatter struct {
 	next slog.Handler
 }
 
-func (c customErrorFormatter) Enabled(ctx context.Context, level slog.Level) bool {
-	return level >= slog.LevelError
+func (c customErrorFormatter) Enabled(context.Context, slog.Level) bool {
+	return true
 }
 
 func (c customErrorFormatter) Handle(ctx context.Context, record slog.Record) error {
-	var attrErr error
+	newAttrs := []slog.Attr{
+		slog.String("severity", strings.ToUpper(record.Level.String())),
+		slog.String("time", record.Time.Format(time.RFC3339)),
+	}
+	var errField string
 	record.Attrs(func(attr slog.Attr) bool {
-		if attr.Key == "err" {
-			var isErr bool
-			if attrErr, isErr = attr.Value.Any().(error); isErr {
-				return false
-			}
-			return false
+		switch attr.Key {
+		case "err":
+			errField = attr.Value.String()
+			newAttrs = append(newAttrs,
+				slog.String("@type", "type.googleapis.com/google.devtools.clouderrorreporting.v1beta1.ReportedErrorEvent"),
+				slog.String("stack_trace", generateStackTrace(record.PC, 3)),
+			)
+		case "level":
+			newAttrs = append(newAttrs, slog.String("severity", strings.ToUpper(attr.Value.String())))
+		default:
+			newAttrs = append(newAttrs, attr)
 		}
 		return true
 	})
-	if attrErr == nil {
-		return c.next.Handle(ctx, record)
+	msg := record.Message
+	if errField != "" {
+		msg = fmt.Sprintf("%s: %s", record.Message, errField)
 	}
-	newRecord := record.Clone()
-	newRecord.AddAttrs(
-		slog.String("severity", strings.ToUpper(record.Level.String())),
-		slog.Any("message", fmt.Errorf("%s: %w", record.Message, attrErr)),
-		slog.String("@type", "type.googleapis.com/google.devtools.clouderrorreporting.v1beta1.ReportedErrorEvent"),
-		slog.String("stack_trace", generateStackTrace(record.PC, 3)),
-	)
+	newAttrs = append(newAttrs, slog.String("message", msg))
+	newRecord := slog.NewRecord(record.Time, record.Level, record.Message, record.PC)
+	newRecord.AddAttrs(newAttrs...)
 	return c.next.Handle(ctx, newRecord)
 }
 

@@ -135,11 +135,11 @@ func (e *Entry) Debugf(format string, args ...interface{}) {
 }
 
 func Info(args ...interface{}) {
-	Infoln(args)
+	Infoln(args...)
 }
 
 func (e *Entry) Info(args ...interface{}) {
-	e.Infoln(args)
+	e.Infoln(args...)
 }
 
 func Infoln(args ...interface{}) {
@@ -413,7 +413,7 @@ func slogArgs(args []interface{}) (string, []interface{}) {
 	msg, ok := args[0].(string)
 	if !ok {
 		msg = fmt.Sprintf("%+v", args[0])
-		args = append(args, "nonstringloggingkey", fmt.Sprintf("%T", args[0]))
+		args = append(args, "nonstringloggingkey", fmt.Sprintf("%+v of type %T", args[0]))
 	}
 	return msg, args[1:]
 }

@@ -306,7 +306,7 @@ func (c *cloudLoggingHandler) Handle(_ context.Context, record slog.Record) erro
 		switch attr.Key {
 		case "err":
 			gcpLoggingRecord.Type = "type.googleapis.com/google.devtools.clouderrorreporting.v1beta1.ReportedErrorEvent"
-			gcpLoggingRecord.StackTrace = string(debug.Stack())
+			gcpLoggingRecord.StackTrace = fmt.Sprintf("%s\n%s", record.Message, string(debug.Stack()))
 			gcpLoggingRecord.Message = fmt.Sprintf("%s: %s", record.Message, attr.Value)
 		case "level", "msg":
 			// filter out

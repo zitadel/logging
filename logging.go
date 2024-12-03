@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"runtime"
@@ -126,7 +127,7 @@ func Debugln(args ...interface{}) {
 func (e *Entry) Debugln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
 	e.log(func() {
-		slog.New(NewCloudLoggingHandler(nil)).Debug(msg, append(e.attributes, attrs...)...)
+		slog.Default().Debug(msg, append(e.attributes, attrs...)...)
 	})
 }
 
@@ -136,7 +137,7 @@ func Debugf(format string, args ...interface{}) {
 
 func (e *Entry) Debugf(format string, args ...interface{}) {
 	e.log(func() {
-		slog.New(NewCloudLoggingHandler(nil)).Debug(slogArgsf(format, args...), e.attributes...)
+		slog.Default().Debug(slogArgsf(format, args...), e.attributes...)
 	})
 }
 
@@ -155,7 +156,7 @@ func Infoln(args ...interface{}) {
 func (e *Entry) Infoln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
 	e.log(func() {
-		slog.New(NewCloudLoggingHandler(nil)).Info(msg, append(e.attributes, attrs...)...)
+		slog.Default().Info(msg, append(e.attributes, attrs...)...)
 	})
 }
 
@@ -165,7 +166,7 @@ func Infof(format string, args ...interface{}) {
 
 func (e *Entry) Infof(format string, args ...interface{}) {
 	e.log(func() {
-		slog.New(NewCloudLoggingHandler(nil)).Info(slogArgsf(format, args...), e.attributes...)
+		slog.Default().Info(slogArgsf(format, args...), e.attributes...)
 	})
 }
 
@@ -184,7 +185,7 @@ func Traceln(args ...interface{}) {
 func (e *Entry) Traceln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
 	e.log(func() {
-		slog.New(NewCloudLoggingHandler(nil)).Log(context.Background(), -8, msg, append(e.attributes, attrs...)...)
+		slog.Default().Log(context.Background(), -8, msg, append(e.attributes, attrs...)...)
 	})
 }
 
@@ -194,7 +195,7 @@ func Tracef(format string, args ...interface{}) {
 
 func (e *Entry) Tracef(format string, args ...interface{}) {
 	e.log(func() {
-		slog.New(NewCloudLoggingHandler(nil)).Log(context.Background(), -8, slogArgsf(format, args...), e.attributes...)
+		slog.Default().Log(context.Background(), -8, slogArgsf(format, args...), e.attributes...)
 	})
 }
 
@@ -213,7 +214,7 @@ func Warnln(args ...interface{}) {
 func (e *Entry) Warnln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
 	e.log(func() {
-		slog.New(NewCloudLoggingHandler(nil)).Warn(msg, append(e.attributes, attrs...)...)
+		slog.Default().Warn(msg, append(e.attributes, attrs...)...)
 	})
 }
 
@@ -223,7 +224,7 @@ func Warnf(format string, args ...interface{}) {
 
 func (e *Entry) Warnf(format string, args ...interface{}) {
 	e.log(func() {
-		slog.New(NewCloudLoggingHandler(nil)).Warn(slogArgsf(format, args...), e.attributes...)
+		slog.Default().Warn(slogArgsf(format, args...), e.attributes...)
 	})
 }
 
@@ -269,10 +270,11 @@ type cloudLoggingHandler struct {
 	groupAttr *slog.Attr
 }
 
-func NewCloudLoggingHandler(optionalSc *ServiceContext) slog.Handler {
+func NewGoogleHandler(writer io.Writer, options *slog.HandlerOptions, data map[string]interface{}) slog.Handler {
 	sc := ServiceContext{}
-	if optionalSc != nil {
-		sc = *optionalSc
+	if optionalSc, ok := data["serviceContext"]; ok {
+		sc.Service, _ = optionalSc.(map[string]interface{})["service"].(string)
+		sc.Version, _ = optionalSc.(map[string]interface{})["version"].(string)
 	}
 	return &cloudLoggingHandler{sc: sc}
 }
@@ -360,7 +362,7 @@ func (c *cloudLoggingHandler) copy() *cloudLoggingHandler {
 func (e *Entry) Errorln(args ...interface{}) {
 	e.log(func() {
 		msg, attrs := slogArgs(args)
-		slog.New(NewCloudLoggingHandler(nil)).Error(msg, append(e.attributes, attrs...)...)
+		slog.Default().Error(msg, append(e.attributes, attrs...)...)
 	})
 }
 
@@ -387,7 +389,7 @@ func Fatalln(args ...interface{}) {
 func (e *Entry) Fatalln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
 	e.log(func() {
-		slog.New(NewCloudLoggingHandler(nil)).Log(context.Background(), 12, msg, append(e.WithError(errors.New(msg)).attributes, attrs...)...)
+		slog.Default().Log(context.Background(), 12, msg, append(e.WithError(errors.New(msg)).attributes, attrs...)...)
 		os.Exit(1)
 	})
 }
@@ -399,7 +401,7 @@ func Fatalf(format string, args ...interface{}) {
 func (e *Entry) Fatalf(format string, args ...interface{}) {
 	msg := slogArgsf(format, args...)
 	e.log(func() {
-		slog.New(NewCloudLoggingHandler(nil)).Log(context.Background(), 12, msg, e.WithError(errors.New(msg)).attributes...)
+		slog.Default().Log(context.Background(), 12, msg, e.WithError(errors.New(msg)).attributes...)
 		os.Exit(1)
 	})
 }
@@ -420,7 +422,7 @@ func (e *Entry) Panicln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
 	e.log(func() {
 		e.WithError(errors.New(msg))
-		slog.New(NewCloudLoggingHandler(nil)).Log(context.Background(), 16, msg, append(e.WithError(errors.New(msg)).attributes, attrs...)...)
+		slog.Default().Log(context.Background(), 16, msg, append(e.WithError(errors.New(msg)).attributes, attrs...)...)
 		panic(msg)
 	})
 }
@@ -432,7 +434,7 @@ func Panicf(format string, args ...interface{}) {
 func (e *Entry) Panicf(format string, args ...interface{}) {
 	msg := slogArgsf(format, args...)
 	e.log(func() {
-		slog.New(NewCloudLoggingHandler(nil)).Log(context.Background(), 16, msg, e.WithError(errors.New(msg)).attributes...)
+		slog.Default().Log(context.Background(), 16, msg, e.WithError(errors.New(msg)).attributes...)
 		panic(msg)
 	})
 }

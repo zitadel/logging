@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"github.com/zitadel/logging/handlers"
 	"log/slog"
 	"os"
 )
@@ -44,7 +45,7 @@ func (c *Config) Slog() *slog.Logger {
 	case FormatterJSON:
 		return slog.New(slog.NewJSONHandler(os.Stderr, opts))
 	case FormatterGoogle:
-		return slog.New(NewGoogleHandler(os.Stderr, opts, c.Formatter.Data))
+		return slog.New(handlers.NewGoogle(os.Stderr, opts, c.Formatter.Data))
 	case "":
 		logger.Warn("no slog format in config, using text handler")
 	default:

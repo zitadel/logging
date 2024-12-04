@@ -2,15 +2,11 @@ package logging
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"runtime"
-	"runtime/debug"
-	"strings"
 	"time"
 )
 
@@ -262,101 +258,6 @@ func (e *Entry) Error(args ...interface{}) {
 
 func Errorln(args ...interface{}) {
 	New().Errorln(args...)
-}
-
-type cloudLoggingHandler struct {
-	sc        ServiceContext
-	attrs     []slog.Attr
-	groupAttr *slog.Attr
-}
-
-func NewGoogleHandler(writer io.Writer, options *slog.HandlerOptions, data map[string]interface{}) slog.Handler {
-	sc := ServiceContext{}
-	if optionalSc, ok := data["serviceContext"]; ok {
-		sc.Service, _ = optionalSc.(map[string]interface{})["service"].(string)
-		sc.Version, _ = optionalSc.(map[string]interface{})["version"].(string)
-	}
-	return &cloudLoggingHandler{sc: sc}
-}
-
-func (c *cloudLoggingHandler) Enabled(context.Context, slog.Level) bool {
-	return true
-}
-
-type ServiceContext struct {
-	Service string `json:"service,omitempty"`
-	Version string `json:"version,omitempty"`
-}
-
-type GoogleCloudLoggingRecord struct {
-	Time           string         `json:"time"`
-	Message        string         `json:"message"`
-	Severity       string         `json:"severity,omitempty"`
-	Type           string         `json:"@type,omitempty"`
-	StackTrace     string         `json:"stack_trace,omitempty"`
-	ServiceContext ServiceContext `json:"serviceContext,omitempty"`
-	AppContext     map[string]any `json:"appContext,omitempty"`
-}
-
-func (c *cloudLoggingHandler) Handle(_ context.Context, record slog.Record) error {
-	gcpLoggingRecord := GoogleCloudLoggingRecord{
-		Time:     record.Time.Format(time.RFC3339),
-		Message:  record.Message,
-		Severity: strings.ToUpper(record.Level.String()),
-	}
-	record.Attrs(func(attr slog.Attr) bool {
-		switch attr.Key {
-		case "err":
-			gcpLoggingRecord.Type = "type.googleapis.com/google.devtools.clouderrorreporting.v1beta1.ReportedErrorEvent"
-			gcpLoggingRecord.StackTrace = fmt.Sprintf("%s\n%s", record.Message, string(debug.Stack()))
-			gcpLoggingRecord.Message = fmt.Sprintf("%s: %s", record.Message, attr.Value)
-		case "level", "msg":
-			// filter out
-		default:
-			if gcpLoggingRecord.AppContext == nil {
-				gcpLoggingRecord.AppContext = make(map[string]any)
-			}
-			gcpLoggingRecord.AppContext[attr.Key] = attr.Value
-		}
-		return true
-	})
-	data, err := json.Marshal(gcpLoggingRecord)
-	if err != nil {
-		return err
-	}
-	_, err = os.Stderr.Write(data)
-	if err != nil {
-		return err
-	}
-	_, err = os.Stderr.Write([]byte("\n"))
-	return err
-}
-
-func (c *cloudLoggingHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	newHandler := c.copy()
-	if newHandler.groupAttr == nil {
-		newHandler.attrs = append(newHandler.attrs, attrs...)
-		return newHandler
-	}
-	newHandler.groupAttr.Value = slog.GroupValue(append(newHandler.groupAttr.Value.Group(), attrs...)...)
-	return newHandler
-}
-
-func (c *cloudLoggingHandler) WithGroup(name string) slog.Handler {
-	newHandler := c.copy()
-	newGroupAttr := slog.Group(name)
-	newHandler.groupAttr = &newGroupAttr
-	newHandler.attrs = append(newHandler.attrs, newGroupAttr)
-	return newHandler
-}
-
-func (c *cloudLoggingHandler) copy() *cloudLoggingHandler {
-	return &cloudLoggingHandler{
-		sc:        c.sc,
-		groupAttr: c.groupAttr,
-		// We create a new attrs slice so the old one is not modified
-		attrs: append([]slog.Attr{}, c.attrs...),
-	}
 }
 
 func (e *Entry) Errorln(args ...interface{}) {

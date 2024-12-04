@@ -53,26 +53,39 @@ type GoogleRecord struct {
 func (c *googleWriter) mapAttributes(jsonHandlerOutput map[string]interface{}) *GoogleRecord {
 	record := new(GoogleRecord)
 	record.Message = jsonHandlerOutput["msg"].(string)
-	record.Severity = jsonHandlerOutput["level"].(string)
 	record.Time = jsonHandlerOutput["time"].(string)
+
+	var level slog.Level
+	if err := level.UnmarshalText([]byte(jsonHandlerOutput["level"].(string))); err != nil {
+		fmt.Println("Error unmarshalling level")
+	}
+	record.Severity = level.String()
 	for key, value := range jsonHandlerOutput {
 		switch key {
 		case "level", "msg", "time":
 		// Filter out
+		case "serviceContext":
+			record.ServiceContext = value.(map[string]any)
 		case "err":
+			if level < slog.LevelError {
+				addToAppContext(record, key, value)
+				break
+			}
 			record.Type = googleErrorType
 			record.StackTrace = fmt.Sprintf("%s\n%s", record.Message, string(debug.Stack()))
 			record.Message = fmt.Sprintf("%s: %s", record.Message, value.(string))
-		case "serviceContext":
-			record.ServiceContext = value.(map[string]any)
 		default:
-			if record.AppContext == nil {
-				record.AppContext = make(map[string]any)
-			}
-			record.AppContext[key] = value
+			addToAppContext(record, key, value)
 		}
 	}
 	return record
+}
+
+func addToAppContext(record *GoogleRecord, key string, value interface{}) {
+	if record.AppContext == nil {
+		record.AppContext = make(map[string]any)
+	}
+	record.AppContext[key] = value
 }
 
 type googleWriter struct {

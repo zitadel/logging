@@ -167,6 +167,27 @@ func TestGoogleHandler(t *testing.T) {
 				"severity": "INFO",
 			},
 		},
+		{
+			name: "err field on info level is unchanged",
+			setupHandler: func(writer io.Writer) slog.Handler {
+				return handlers.NewGoogle(writer, nil, nil).WithAttrs([]slog.Attr{
+					slog.Any("err", errors.New("error message")),
+				})
+			},
+			record: slog.Record{
+				Time:    logTime,
+				Level:   slog.LevelInfo,
+				Message: "Info log with err field",
+			},
+			expectedOutput: map[string]interface{}{
+				"time":     logTime.Format(time.RFC3339Nano),
+				"message":  "Info log with err field",
+				"severity": "INFO",
+				"appContext": map[string]interface{}{
+					"err": "error message",
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

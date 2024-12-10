@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"runtime/debug"
 )
 
 // Constants for magic strings
@@ -45,7 +44,6 @@ type GoogleRecord struct {
 	Message        string         `json:"message"`
 	Severity       string         `json:"severity,omitempty"`
 	Type           string         `json:"@type,omitempty"`
-	StackTrace     string         `json:"stack_trace,omitempty"`
 	AppContext     map[string]any `json:"appContext,omitempty"`
 	ServiceContext map[string]any `json:"serviceContext,omitempty"`
 }
@@ -60,20 +58,30 @@ func (c *googleWriter) mapAttributes(jsonHandlerOutput map[string]interface{}) *
 		fmt.Println("Error unmarshalling level")
 	}
 	record.Severity = level.String()
+	var dropErrKey bool
+	if level >= slog.LevelError {
+		msg := record.Message
+		if err, ok := jsonHandlerOutput["err"]; ok {
+			msg = fmt.Sprintf("%s: %s", record.Message, err)
+		}
+		record.Type = googleErrorType
+		record.Message = msg
+		// On lower levels, we add the err field to the app context
+		dropErrKey = true
+	}
+
 	for key, value := range jsonHandlerOutput {
 		switch key {
 		case "level", "msg", "time":
-		// Filter out
+			// Don't add these to the app context, as they are top-level fields
 		case "serviceContext":
+			// Add this to the top level, not to the app context
 			record.ServiceContext = value.(map[string]any)
 		case "err":
-			if level < slog.LevelError {
-				addToAppContext(record, key, value)
+			if dropErrKey {
 				break
 			}
-			record.Type = googleErrorType
-			record.StackTrace = fmt.Sprintf("%s\n%s", record.Message, string(debug.Stack()))
-			record.Message = fmt.Sprintf("%s: %s", record.Message, value.(string))
+			addToAppContext(record, key, value)
 		default:
 			addToAppContext(record, key, value)
 		}

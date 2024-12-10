@@ -1,12 +1,15 @@
 package logging
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"runtime"
+	"runtime/debug"
+	"strings"
 	"time"
 )
 
@@ -35,9 +38,7 @@ func LogWithFields(id string, fields ...interface{}) *Entry {
 }
 
 // New instantiates a new entry
-func New() *Entry {
-	return &Entry{}
-}
+func New() *Entry { return &Entry{} }
 
 func OnError(err error) *Entry {
 	return New().OnError(err)
@@ -124,7 +125,7 @@ func (e *Entry) Debugln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
 	e.log(func() {
 		slog.Default().Debug(msg, append(e.attributes, attrs...)...)
-	})
+	}, true)
 }
 
 func Debugf(format string, args ...interface{}) {
@@ -134,7 +135,7 @@ func Debugf(format string, args ...interface{}) {
 func (e *Entry) Debugf(format string, args ...interface{}) {
 	e.log(func() {
 		slog.Default().Debug(slogArgsf(format, args...), e.attributes...)
-	})
+	}, true)
 }
 
 func Info(args ...interface{}) {
@@ -153,7 +154,7 @@ func (e *Entry) Infoln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
 	e.log(func() {
 		slog.Default().Info(msg, append(e.attributes, attrs...)...)
-	})
+	}, false)
 }
 
 func Infof(format string, args ...interface{}) {
@@ -163,7 +164,7 @@ func Infof(format string, args ...interface{}) {
 func (e *Entry) Infof(format string, args ...interface{}) {
 	e.log(func() {
 		slog.Default().Info(slogArgsf(format, args...), e.attributes...)
-	})
+	}, false)
 }
 
 func Trace(args ...interface{}) {
@@ -182,7 +183,7 @@ func (e *Entry) Traceln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
 	e.log(func() {
 		slog.Default().Log(context.Background(), -8, msg, append(e.attributes, attrs...)...)
-	})
+	}, true)
 }
 
 func Tracef(format string, args ...interface{}) {
@@ -192,7 +193,7 @@ func Tracef(format string, args ...interface{}) {
 func (e *Entry) Tracef(format string, args ...interface{}) {
 	e.log(func() {
 		slog.Default().Log(context.Background(), -8, slogArgsf(format, args...), e.attributes...)
-	})
+	}, true)
 }
 
 func Warn(args ...interface{}) {
@@ -211,7 +212,7 @@ func (e *Entry) Warnln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
 	e.log(func() {
 		slog.Default().Warn(msg, append(e.attributes, attrs...)...)
-	})
+	}, false)
 }
 
 func Warnf(format string, args ...interface{}) {
@@ -221,7 +222,7 @@ func Warnf(format string, args ...interface{}) {
 func (e *Entry) Warnf(format string, args ...interface{}) {
 	e.log(func() {
 		slog.Default().Warn(slogArgsf(format, args...), e.attributes...)
-	})
+	}, false)
 }
 
 func Warning(args ...interface{}) {
@@ -264,7 +265,7 @@ func (e *Entry) Errorln(args ...interface{}) {
 	e.log(func() {
 		msg, attrs := slogArgs(args)
 		slog.Default().Error(msg, append(e.attributes, attrs...)...)
-	})
+	}, true)
 }
 
 func Errorf(format string, args ...interface{}) {
@@ -272,7 +273,9 @@ func Errorf(format string, args ...interface{}) {
 }
 
 func (e *Entry) Errorf(format string, args ...interface{}) {
-	e.log(func() { slog.Error(slogArgsf(format, args...), e.attributes...) })
+	e.log(func() {
+		slog.Error(slogArgsf(format, args...), e.attributes...)
+	}, true)
 }
 
 func Fatal(args ...interface{}) {
@@ -292,7 +295,7 @@ func (e *Entry) Fatalln(args ...interface{}) {
 	e.log(func() {
 		slog.Default().Log(context.Background(), 12, msg, append(e.WithError(errors.New(msg)).attributes, attrs...)...)
 		os.Exit(1)
-	})
+	}, true)
 }
 
 func Fatalf(format string, args ...interface{}) {
@@ -304,7 +307,7 @@ func (e *Entry) Fatalf(format string, args ...interface{}) {
 	e.log(func() {
 		slog.Default().Log(context.Background(), 12, msg, e.WithError(errors.New(msg)).attributes...)
 		os.Exit(1)
-	})
+	}, true)
 }
 
 func Panic(args ...interface{}) {
@@ -325,7 +328,7 @@ func (e *Entry) Panicln(args ...interface{}) {
 		e.WithError(errors.New(msg))
 		slog.Default().Log(context.Background(), 16, msg, append(e.WithError(errors.New(msg)).attributes, attrs...)...)
 		panic(msg)
-	})
+	}, true)
 }
 
 func Panicf(format string, args ...interface{}) {
@@ -337,15 +340,18 @@ func (e *Entry) Panicf(format string, args ...interface{}) {
 	e.log(func() {
 		slog.Default().Log(context.Background(), 16, msg, e.WithError(errors.New(msg)).attributes...)
 		panic(msg)
-	})
+	}, true)
 }
 
-func (e *Entry) log(log func()) {
+func (e *Entry) log(log func(), withStack bool) {
 	e = e.checkOnError()
 	if e == nil {
 		return
 	}
-	addCaller(e)
+	e = e.withCaller()
+	if withStack {
+		e = e.withStack()
+	}
 	log()
 }
 
@@ -359,11 +365,24 @@ func (e *Entry) checkOnError() *Entry {
 	return e
 }
 
-func addCaller(e *Entry) {
+func (e *Entry) withCaller() *Entry {
 	_, file, no, ok := runtime.Caller(3)
 	if ok {
-		e.WithField("caller", fmt.Sprintf("%s:%d", file, no))
+		return e.WithField("caller", fmt.Sprintf("%s:%d", file, no))
 	}
+	return e
+}
+
+func (e *Entry) withStack() *Entry {
+	lines := bytes.Split(debug.Stack(), []byte("\n"))
+	var filtered []string
+	for _, line := range lines {
+		strLine := string(line)
+		if !strings.Contains(strLine, "github.com/zitadel/logging") && !strings.Contains(strLine, "runtime/debug.Stack()") && !strings.Contains(strLine, "runtime/debug/stack.go") {
+			filtered = append(filtered, strLine)
+		}
+	}
+	return e.WithField("stack_trace", strings.Join(filtered, "\n"))
 }
 
 func slogArgs(args []interface{}) (string, []interface{}) {

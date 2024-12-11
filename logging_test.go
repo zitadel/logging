@@ -4,11 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/zitadel/logging/handlers"
-	"io"
 	"log/slog"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 )
@@ -30,7 +27,7 @@ func TestWithLogID(t *testing.T) {
 			Log("UTILS-Ld9V").WithError(errTest),
 			map[string]interface{}{
 				"logID": "UTILS-Ld9V",
-				"error": errTest.Error(),
+				"err":   errTest.Error(),
 			},
 		},
 		{
@@ -38,7 +35,7 @@ func TestWithLogID(t *testing.T) {
 			Log("UTILS-Ld9V").OnError(errTest),
 			map[string]interface{}{
 				"logID": "UTILS-Ld9V",
-				"error": errTest.Error(),
+				"err":   errTest.Error(),
 			},
 		},
 		{
@@ -88,14 +85,14 @@ func TestWithoutLogID(t *testing.T) {
 			"with error",
 			New().WithError(errTest),
 			map[string]interface{}{
-				"error": errTest.Error(),
+				"err": errTest.Error(),
 			},
 		},
 		{
 			"on error",
 			OnError(errTest),
 			map[string]interface{}{
-				"error": errTest.Error(),
+				"err": errTest.Error(),
 			},
 		},
 		{
@@ -127,36 +124,10 @@ func TestWithoutLogID(t *testing.T) {
 		},
 		{
 			"group attribute",
-			New().WithField("group1", slog.Group("key", "value")),
+			New().WithField("group1", slog.GroupValue(slog.String("key", "value"))),
 			map[string]interface{}{
 				"group1": map[string]interface{}{
 					"key": "value",
-				},
-			},
-		},
-		{
-			"nested group attribute",
-			WithFields(slog.Group("group1", "key", "value")),
-			map[string]interface{}{
-				"group1": map[string]interface{}{
-					"key": "value",
-				},
-			},
-
-			name: "WithGroup nested groups",
-			handler: func(writer io.Writer) slog.Handler {
-				return handlers.NewGoogle(writer, nil, nil).WithGroup("group1").WithGroup("group2")
-			},
-			log: func() { logging.Info("Log in nested group") },
-			expectedOutput: map[string]interface{}{
-				"message":  "Log in nested group",
-				"severity": "INFO",
-				"app_context": map[string]interface{}{
-					"group1": map[string]interface{}{
-						"group2": map[string]interface{}{
-							"key": "value",
-						},
-					},
 				},
 			},
 		},
@@ -196,16 +167,6 @@ func testLogOutputFn(test logTest) func(t *testing.T) {
 		}
 		// We want to use reflect.DeepEqual later, so we remove the dynamic "time" field
 		delete(actual, "time")
-		if caller, ok := actual["caller"]; !ok || !strings.Contains(caller.(string), callerFile) {
-			t.Errorf("expected caller to be present and contain %q, got: %q", callerFile, caller)
-		}
-		// We want to use reflect.DeepEqual later, so we remove the dynamic "caller" field
-		delete(actual, "caller")
-		if stackTrace, ok := actual["stack_trace"]; !ok || !strings.Contains(stackTrace.(string), callerFile) {
-			t.Errorf("expected stack trace to be presend and contain %q, got: %q", callerFile, stackTrace)
-		}
-		// We want to use reflect.DeepEqual later, so we remove the dynamic "stack_trace" field
-		delete(actual, "stack_trace")
 		test.expectedOutput["msg"] = ""
 		test.expectedOutput["level"] = slog.LevelDebug.String()
 		if !reflect.DeepEqual(actual, test.expectedOutput) {

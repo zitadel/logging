@@ -1,24 +1,20 @@
 package logging
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os"
-	"runtime"
-	"strings"
 	"time"
 )
 
 type Entry struct {
-	topLevelAttributes []slog.Attr
-	attributes         []slog.Attr
-	isOnError          bool
-	err                error
-	ts                 time.Time
-	skipToCaller       int
+	attributes   []slog.Attr
+	isOnError    bool
+	err          error
+	ts           time.Time
+	skipToCaller int
 }
 
 var idKey = "logID"
@@ -99,18 +95,6 @@ func (e *Entry) WithTime(t time.Time) *Entry {
 	return e
 }
 
-func toFields(fields ...interface{}) []slog.Attr {
-	if len(fields)%2 != 0 {
-		return []slog.Attr{slog.Int("oddFields", len(fields))}
-	}
-	logFields := make([]slog.Attr, 0, len(fields)/2)
-	for i := 0; i < len(fields); i = i + 2 {
-		key := fields[i].(string)
-		logFields = append(logFields, slog.Any(key, fields[i+1]))
-	}
-	return logFields
-}
-
 func Debug(args ...interface{}) {
 	Debugln(args...)
 }
@@ -125,9 +109,9 @@ func Debugln(args ...interface{}) {
 
 func (e *Entry) Debugln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
-	e.log(func() {
-		slog.Default().Debug(msg, anyArgs(append(e.attributes, attrs...))...)
-	}, true)
+	e.log(func(logger *slog.Logger) {
+		logger.Debug(msg, anyArgs(append(e.attributes, attrs...))...)
+	})
 }
 
 func Debugf(format string, args ...interface{}) {
@@ -135,9 +119,9 @@ func Debugf(format string, args ...interface{}) {
 }
 
 func (e *Entry) Debugf(format string, args ...interface{}) {
-	e.log(func() {
+	e.log(func(l *slog.Logger) {
 		slog.Default().Debug(slogArgsf(format, args...), anyArgs(e.attributes)...)
-	}, true)
+	})
 }
 
 func Info(args ...interface{}) {
@@ -154,9 +138,9 @@ func Infoln(args ...interface{}) {
 
 func (e *Entry) Infoln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
-	e.log(func() {
-		slog.Default().Info(msg, anyArgs(append(e.attributes, attrs...))...)
-	}, false)
+	e.log(func(l *slog.Logger) {
+		l.Info(msg, anyArgs(append(e.attributes, attrs...))...)
+	})
 }
 
 func Infof(format string, args ...interface{}) {
@@ -164,9 +148,9 @@ func Infof(format string, args ...interface{}) {
 }
 
 func (e *Entry) Infof(format string, args ...interface{}) {
-	e.log(func() {
-		slog.Default().Info(slogArgsf(format, args...), anyArgs(e.attributes)...)
-	}, false)
+	e.log(func(l *slog.Logger) {
+		l.Info(slogArgsf(format, args...), anyArgs(e.attributes)...)
+	})
 }
 
 func Trace(args ...interface{}) {
@@ -183,9 +167,9 @@ func Traceln(args ...interface{}) {
 
 func (e *Entry) Traceln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
-	e.log(func() {
-		slog.Default().Log(context.Background(), -8, msg, anyArgs(append(e.attributes, attrs...))...)
-	}, true)
+	e.log(func(l *slog.Logger) {
+		l.Log(context.Background(), -8, msg, anyArgs(append(e.attributes, attrs...))...)
+	})
 }
 
 func Tracef(format string, args ...interface{}) {
@@ -193,9 +177,9 @@ func Tracef(format string, args ...interface{}) {
 }
 
 func (e *Entry) Tracef(format string, args ...interface{}) {
-	e.log(func() {
-		slog.Default().Log(context.Background(), -8, slogArgsf(format, args...), anyArgs(e.attributes)...)
-	}, true)
+	e.log(func(l *slog.Logger) {
+		l.Log(context.Background(), -8, slogArgsf(format, args...), anyArgs(e.attributes)...)
+	})
 }
 
 func Warn(args ...interface{}) {
@@ -212,9 +196,9 @@ func Warnln(args ...interface{}) {
 
 func (e *Entry) Warnln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
-	e.log(func() {
-		slog.Default().Warn(msg, anyArgs(append(e.attributes, attrs...))...)
-	}, false)
+	e.log(func(l *slog.Logger) {
+		l.Warn(msg, anyArgs(append(e.attributes, attrs...))...)
+	})
 }
 
 func Warnf(format string, args ...interface{}) {
@@ -222,9 +206,9 @@ func Warnf(format string, args ...interface{}) {
 }
 
 func (e *Entry) Warnf(format string, args ...interface{}) {
-	e.log(func() {
-		slog.Default().Warn(slogArgsf(format, args...), anyArgs(e.attributes)...)
-	}, false)
+	e.log(func(l *slog.Logger) {
+		l.Warn(slogArgsf(format, args...), anyArgs(e.attributes)...)
+	})
 }
 
 func Warning(args ...interface{}) {
@@ -264,10 +248,10 @@ func Errorln(args ...interface{}) {
 }
 
 func (e *Entry) Errorln(args ...interface{}) {
-	e.log(func() {
+	e.log(func(l *slog.Logger) {
 		msg, attrs := slogArgs(args)
-		slog.Default().Error(msg, anyArgs(append(e.attributes, attrs...))...)
-	}, true)
+		l.Error(msg, anyArgs(append(e.attributes, attrs...))...)
+	})
 }
 
 func Errorf(format string, args ...interface{}) {
@@ -275,9 +259,9 @@ func Errorf(format string, args ...interface{}) {
 }
 
 func (e *Entry) Errorf(format string, args ...interface{}) {
-	e.log(func() {
+	e.log(func(l *slog.Logger) {
 		slog.Error(slogArgsf(format, args...), anyArgs(e.attributes)...)
-	}, true)
+	})
 }
 
 func Fatal(args ...interface{}) {
@@ -294,10 +278,10 @@ func Fatalln(args ...interface{}) {
 
 func (e *Entry) Fatalln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
-	e.log(func() {
-		slog.Default().Log(context.Background(), 12, msg, anyArgs(append(e.WithError(errors.New(msg)).attributes, attrs...))...)
+	e.log(func(l *slog.Logger) {
+		l.Log(context.Background(), 12, msg, anyArgs(append(e.WithError(errors.New(msg)).attributes, attrs...))...)
 		os.Exit(1)
-	}, true)
+	})
 }
 
 func Fatalf(format string, args ...interface{}) {
@@ -306,10 +290,10 @@ func Fatalf(format string, args ...interface{}) {
 
 func (e *Entry) Fatalf(format string, args ...interface{}) {
 	msg := slogArgsf(format, args...)
-	e.log(func() {
-		slog.Default().Log(context.Background(), 12, msg, anyArgs(e.WithError(errors.New(msg)).attributes)...)
+	e.log(func(l *slog.Logger) {
+		l.Log(context.Background(), 12, msg, anyArgs(e.WithError(errors.New(msg)).attributes)...)
 		os.Exit(1)
-	}, true)
+	})
 }
 
 func Panic(args ...interface{}) {
@@ -326,11 +310,10 @@ func Panicln(args ...interface{}) {
 
 func (e *Entry) Panicln(args ...interface{}) {
 	msg, attrs := slogArgs(args)
-	e.log(func() {
-		e.WithError(errors.New(msg))
-		slog.Default().Log(context.Background(), 16, msg, anyArgs(append(e.WithError(errors.New(msg)).attributes, attrs...))...)
+	e.log(func(l *slog.Logger) {
+		l.Log(context.Background(), 16, msg, anyArgs(append(e.WithError(errors.New(msg)).attributes, attrs...))...)
 		panic(msg)
-	}, true)
+	})
 }
 
 func Panicf(format string, args ...interface{}) {
@@ -339,22 +322,18 @@ func Panicf(format string, args ...interface{}) {
 
 func (e *Entry) Panicf(format string, args ...interface{}) {
 	msg := slogArgsf(format, args...)
-	e.log(func() {
-		slog.Default().Log(context.Background(), 16, msg, anyArgs(e.WithError(errors.New(msg)).attributes)...)
+	e.log(func(l *slog.Logger) {
+		l.Log(context.Background(), 16, msg, anyArgs(e.WithError(errors.New(msg)).attributes)...)
 		panic(msg)
-	}, true)
+	})
 }
 
-func (e *Entry) log(log func(), withStack bool) {
+func (e *Entry) log(log func(logger *slog.Logger)) {
 	e = e.checkOnError()
 	if e == nil {
 		return
 	}
-	e.addCaller()
-	if withStack {
-		e.addStack()
-	}
-	log()
+	log(slog.Default())
 }
 
 func (e *Entry) checkOnError() *Entry {
@@ -367,57 +346,6 @@ func (e *Entry) checkOnError() *Entry {
 	return e
 }
 
-func (e *Entry) addCaller() {
-	file, line, skip := findCallerSkip()
-	if file != "" {
-		e.attributes = append(e.attributes, slog.String("caller", fmt.Sprintf("%s:%d", file, line)))
-		e.skipToCaller = skip
-	}
-}
-
-// findCallerSkip identifies the caller and returns the file, line, and skip level
-func findCallerSkip() (file string, line int, skip int) {
-	skip = 2 // Start at skip = 2 to bypass findCallerSkip and addCaller itself
-	for {
-		_, f, l, ok := runtime.Caller(skip)
-		if !ok {
-			break
-		}
-		if !skipCaller(f) {
-			return f, l, skip
-		}
-		skip++
-	}
-	return "", 0, 0
-}
-
-// skipCaller checks if the file belongs to the logging package. However, it doesn't skip test files.
-func skipCaller(file string) bool {
-	return strings.Contains(file, "github.com/zitadel/logging") &&
-		!strings.Contains(file, "_test.go")
-}
-
-// addStack generates a stack trace in the same format as debug.Stack()
-func (e *Entry) addStack() {
-	if e.skipToCaller == 0 {
-		e.attributes = append(e.attributes, slog.String("stack_trace", "stack trace not available, skipToCaller is 0, which means addCaller was not called"))
-		return
-	}
-	callers := make([]uintptr, 32) // Collect up to 32 stack frames
-	n := runtime.Callers(e.skipToCaller, callers)
-	frames := runtime.CallersFrames(callers[:n])
-
-	var buf bytes.Buffer
-	for {
-		frame, more := frames.Next()
-		buf.WriteString(fmt.Sprintf("%s\n\t%s:%d\n", frame.Function, frame.File, frame.Line))
-		if !more {
-			break
-		}
-	}
-	e.attributes = append(e.attributes, slog.String("stack_trace", buf.String()))
-}
-
 func slogArgs(args []any) (string, []slog.Attr) {
 	if len(args) == 0 {
 		return "", nil
@@ -428,6 +356,18 @@ func slogArgs(args []any) (string, []slog.Attr) {
 		args = append(args, "nonstringloggingkey", fmt.Sprintf("%+v of type %T", args[0], args[0]))
 	}
 	return msg, toFields(args[1:]...)
+}
+
+func toFields(fields ...interface{}) []slog.Attr {
+	if len(fields)%2 != 0 {
+		return []slog.Attr{slog.Int("oddFields", len(fields))}
+	}
+	logFields := make([]slog.Attr, 0, len(fields)/2)
+	for i := 0; i < len(fields); i = i + 2 {
+		key := fields[i].(string)
+		logFields = append(logFields, slog.Any(key, fields[i+1]))
+	}
+	return logFields
 }
 
 func anyArgs(attrs []slog.Attr) (anys []any) {

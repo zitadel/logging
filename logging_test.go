@@ -1,362 +1,215 @@
 package logging
 
 import (
-	"errors"
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"github.com/zitadel/logging/handlers"
+	"io"
+	"log/slog"
+	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 var errTest = fmt.Errorf("im an error")
+var callerFile = "github.com/zitadel/logging/logging_test.go"
 
 func TestWithLogID(t *testing.T) {
-	tests := []struct {
-		name           string
-		entry          *Entry
-		expectedFields map[string]func(interface{}) bool
-	}{
+	tests := []logTest{
 		{
 			"without error",
 			Log("UTILS-B7l7"),
-			map[string]func(interface{}) bool{
-				"logID": func(got interface{}) bool {
-					logID, ok := got.(string)
-					if !ok {
-						return false
-					}
-					return logID == "UTILS-B7l7"
-				},
-				"caller": func(got interface{}) bool {
-					s, ok := got.(string)
-					if !ok {
-						return false
-					}
-					return strings.Contains(s, "logging/logging_test.go:")
-				},
+			map[string]interface{}{
+				"logID": "UTILS-B7l7",
 			},
 		},
 		{
 			"with error",
 			Log("UTILS-Ld9V").WithError(errTest),
-			map[string]func(interface{}) bool{
-				"logID": func(got interface{}) bool {
-					logID, ok := got.(string)
-					if !ok {
-						return false
-					}
-					return logID == "UTILS-Ld9V"
-				},
-				"caller": func(got interface{}) bool {
-					s, ok := got.(string)
-					if !ok {
-						return false
-					}
-					return strings.Contains(s, "logging/logging_test.go:")
-				},
-				"error": func(got interface{}) bool {
-					err, ok := got.(error)
-					if !ok {
-						return false
-					}
-					return errors.Is(err, errTest)
-				},
+			map[string]interface{}{
+				"logID": "UTILS-Ld9V",
+				"error": errTest.Error(),
 			},
 		},
 		{
 			"on error",
 			Log("UTILS-Ld9V").OnError(errTest),
-			map[string]func(interface{}) bool{
-				"logID": func(got interface{}) bool {
-					logID, ok := got.(string)
-					if !ok {
-						return false
-					}
-					return logID == "UTILS-Ld9V"
-				},
-				"caller": func(got interface{}) bool {
-					s, ok := got.(string)
-					if !ok {
-						return false
-					}
-					return strings.Contains(s, "logging/logging_test.go:")
-				},
-				"error": func(got interface{}) bool {
-					err, ok := got.(error)
-					if !ok {
-						return false
-					}
-					return errors.Is(err, errTest)
-				},
+			map[string]interface{}{
+				"logID": "UTILS-Ld9V",
+				"error": errTest.Error(),
 			},
 		},
 		{
 			"on error without",
 			Log("UTILS-Ld9V").OnError(nil),
-			map[string]func(interface{}) bool{
-				"logID": func(got interface{}) bool {
-					logID, ok := got.(string)
-					if !ok {
-						return false
-					}
-					return logID == "UTILS-Ld9V"
-				},
-			},
+			nil,
 		},
 		{
 			"with fields",
 			LogWithFields("LOGGI-5kk6z", "field1", 134, "field2", "asdlkfj"),
-			map[string]func(interface{}) bool{
-				"logID": func(got interface{}) bool {
-					logID, ok := got.(string)
-					if !ok {
-						return false
-					}
-					return logID == "LOGGI-5kk6z"
-				},
-				"caller": func(got interface{}) bool {
-					s, ok := got.(string)
-					if !ok {
-						return false
-					}
-					return strings.Contains(s, "logging/logging_test.go:")
-				},
-				"field1": func(got interface{}) bool {
-					i, ok := got.(int)
-					if !ok {
-						return false
-					}
-					return i == 134
-				},
-				"field2": func(got interface{}) bool {
-					i, ok := got.(string)
-					if !ok {
-						return false
-					}
-					return i == "asdlkfj"
-				},
+			map[string]interface{}{
+				"logID":  "LOGGI-5kk6z",
+				"field1": float64(134),
+				"field2": "asdlkfj",
 			},
 		},
 		{
 			"with field",
 			LogWithFields("LOGGI-5kk6z").WithField("field1", 134),
-			map[string]func(interface{}) bool{
-				"logID": func(got interface{}) bool {
-					logID, ok := got.(string)
-					if !ok {
-						return false
-					}
-					return logID == "LOGGI-5kk6z"
-				},
-				"caller": func(got interface{}) bool {
-					s, ok := got.(string)
-					if !ok {
-						return false
-					}
-					return strings.Contains(s, "logging/logging_test.go:")
-				},
-				"field1": func(got interface{}) bool {
-					i, ok := got.(int)
-					if !ok {
-						return false
-					}
-					return i == 134
-				},
+			map[string]interface{}{
+				"logID":  "LOGGI-5kk6z",
+				"field1": float64(134),
 			},
 		},
 		{
 			"fields odd",
 			LogWithFields("LOGGI-xWzy4", "kevin"),
-			map[string]func(interface{}) bool{
-				"logID": func(got interface{}) bool {
-					logID, ok := got.(string)
-					if !ok {
-						return false
-					}
-					return logID == "LOGGI-xWzy4"
-				},
-				"caller": func(got interface{}) bool {
-					s, ok := got.(string)
-					if !ok {
-						return false
-					}
-					return strings.Contains(s, "logging/logging_test.go:")
-				},
-				"oddFields": func(got interface{}) bool {
-					i, ok := got.(int)
-					if !ok {
-						return false
-					}
-					return i == 1
-				},
+			map[string]interface{}{
+				"logID":     "LOGGI-xWzy4",
+				"oddFields": float64(1),
 			},
 		},
 	}
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			test.entry.Debug()
-			if len(test.entry.Data) != len(test.expectedFields) {
-				t.Errorf("enexpected amount of fields got: %d, want %d", len(test.entry.Data), len(test.expectedFields))
-			}
-			for key, expectedValue := range test.expectedFields {
-				value, ok := test.entry.Data[key]
-				if !ok {
-					t.Errorf("\"%s\" was not expected", key)
-				}
-				if !expectedValue(value) {
-					t.Errorf("wrong value for \"%s\": got %T.%v", key, value, value)
-				}
-			}
-		})
+		t.Run(test.name, testLogOutputFn(test))
 	}
 }
 
 func TestWithoutLogID(t *testing.T) {
-	tests := []struct {
-		name           string
-		entry          *Entry
-		expectedFields map[string]func(interface{}) bool
-	}{
+	tests := []logTest{
 		{
 			"without error",
 			New(),
-			map[string]func(interface{}) bool{
-				"caller": func(got interface{}) bool {
-					s, ok := got.(string)
-					if !ok {
-						return false
-					}
-					return strings.Contains(s, "logging/logging_test.go:")
-				},
-			},
+			map[string]interface{}{},
 		},
 		{
 			"with error",
 			New().WithError(errTest),
-			map[string]func(interface{}) bool{
-				"caller": func(got interface{}) bool {
-					s, ok := got.(string)
-					if !ok {
-						return false
-					}
-					return strings.Contains(s, "logging/logging_test.go:")
-				},
-				"error": func(got interface{}) bool {
-					err, ok := got.(error)
-					if !ok {
-						return false
-					}
-					return errors.Is(err, errTest)
-				},
+			map[string]interface{}{
+				"error": errTest.Error(),
 			},
 		},
 		{
 			"on error",
 			OnError(errTest),
-			map[string]func(interface{}) bool{
-				"caller": func(got interface{}) bool {
-					s, ok := got.(string)
-					if !ok {
-						return false
-					}
-					return strings.Contains(s, "logging/logging_test.go:")
-				},
-				"error": func(got interface{}) bool {
-					err, ok := got.(error)
-					if !ok {
-						return false
-					}
-					return errors.Is(err, errTest)
-				},
+			map[string]interface{}{
+				"error": errTest.Error(),
 			},
 		},
 		{
 			"on error without",
 			OnError(nil),
-			map[string]func(interface{}) bool{},
+			nil,
 		},
 		{
 			"with fields",
 			WithFields("field1", 134, "field2", "asdlkfj"),
-			map[string]func(interface{}) bool{
-				"caller": func(got interface{}) bool {
-					s, ok := got.(string)
-					if !ok {
-						return false
-					}
-					return strings.Contains(s, "logging/logging_test.go:")
-				},
-				"field1": func(got interface{}) bool {
-					i, ok := got.(int)
-					if !ok {
-						return false
-					}
-					return i == 134
-				},
-				"field2": func(got interface{}) bool {
-					i, ok := got.(string)
-					if !ok {
-						return false
-					}
-					return i == "asdlkfj"
-				},
+			map[string]interface{}{
+				"field1": float64(134),
+				"field2": "asdlkfj",
 			},
 		},
 		{
 			"with field",
 			WithFields().WithField("field1", 134),
-			map[string]func(interface{}) bool{
-				"caller": func(got interface{}) bool {
-					s, ok := got.(string)
-					if !ok {
-						return false
-					}
-					return strings.Contains(s, "logging/logging_test.go:")
-				},
-				"field1": func(got interface{}) bool {
-					i, ok := got.(int)
-					if !ok {
-						return false
-					}
-					return i == 134
-				},
+			map[string]interface{}{
+				"field1": float64(134),
 			},
 		},
 		{
 			"fields odd",
 			WithFields("kevin"),
-			map[string]func(interface{}) bool{
-				"caller": func(got interface{}) bool {
-					s, ok := got.(string)
-					if !ok {
-						return false
-					}
-					return strings.Contains(s, "logging/logging_test.go:")
+			map[string]interface{}{
+				"oddFields": float64(1),
+			},
+		},
+		{
+			"group attribute",
+			New().WithField("group1", slog.Group("key", "value")),
+			map[string]interface{}{
+				"group1": map[string]interface{}{
+					"key": "value",
 				},
-				"oddFields": func(got interface{}) bool {
-					i, ok := got.(int)
-					if !ok {
-						return false
-					}
-					return i == 1
+			},
+		},
+		{
+			"nested group attribute",
+			WithFields(slog.Group("group1", "key", "value")),
+			map[string]interface{}{
+				"group1": map[string]interface{}{
+					"key": "value",
+				},
+			},
+
+			name: "WithGroup nested groups",
+			handler: func(writer io.Writer) slog.Handler {
+				return handlers.NewGoogle(writer, nil, nil).WithGroup("group1").WithGroup("group2")
+			},
+			log: func() { logging.Info("Log in nested group") },
+			expectedOutput: map[string]interface{}{
+				"message":  "Log in nested group",
+				"severity": "INFO",
+				"app_context": map[string]interface{}{
+					"group1": map[string]interface{}{
+						"group2": map[string]interface{}{
+							"key": "value",
+						},
+					},
 				},
 			},
 		},
 	}
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			test.entry.Debug()
-			if len(test.entry.Data) != len(test.expectedFields) {
-				t.Errorf("enexpected amount of fields got: %d, want %d", len(test.entry.Data), len(test.expectedFields))
+		t.Run(test.name, testLogOutputFn(test))
+	}
+}
+
+type logTest struct {
+	name           string
+	entry          *Entry
+	expectedOutput map[string]interface{}
+}
+
+func testLogOutputFn(test logTest) func(t *testing.T) {
+	return func(t *testing.T) {
+		var buf bytes.Buffer
+		slog.SetDefault(slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{
+			AddSource: false,
+			Level:     slog.LevelDebug,
+		})))
+		test.entry.Debug()
+		bufBytes := buf.Bytes()
+		if test.expectedOutput == nil {
+			if len(bufBytes) > 0 {
+				t.Fatalf("expected no output, got: %q", bufBytes)
 			}
-			for key, expectedValue := range test.expectedFields {
-				value, ok := test.entry.Data[key]
-				if !ok {
-					t.Errorf("\"%s\" was not expected", key)
-				}
-				if !expectedValue(value) {
-					t.Errorf("wrong value for \"%s\": got %T.%v", key, value, value)
-				}
-			}
-		})
+			return
+		}
+		var actual = make(map[string]interface{})
+		if err := json.Unmarshal(bufBytes, &actual); err != nil {
+			t.Fatalf("failed to unmarshal %q into map[string]interface{}: %v", bufBytes, err)
+		}
+		if _, err := time.Parse(time.RFC3339Nano, actual["time"].(string)); err != nil {
+			t.Errorf("expected time in RFC3339Nano format, got: %q", actual["time"])
+		}
+		// We want to use reflect.DeepEqual later, so we remove the dynamic "time" field
+		delete(actual, "time")
+		if caller, ok := actual["caller"]; !ok || !strings.Contains(caller.(string), callerFile) {
+			t.Errorf("expected caller to be present and contain %q, got: %q", callerFile, caller)
+		}
+		// We want to use reflect.DeepEqual later, so we remove the dynamic "caller" field
+		delete(actual, "caller")
+		if stackTrace, ok := actual["stack_trace"]; !ok || !strings.Contains(stackTrace.(string), callerFile) {
+			t.Errorf("expected stack trace to be presend and contain %q, got: %q", callerFile, stackTrace)
+		}
+		// We want to use reflect.DeepEqual later, so we remove the dynamic "stack_trace" field
+		delete(actual, "stack_trace")
+		test.expectedOutput["msg"] = ""
+		test.expectedOutput["level"] = slog.LevelDebug.String()
+		if !reflect.DeepEqual(actual, test.expectedOutput) {
+			t.Errorf("expected output: %+v, got: %+v", test.expectedOutput, actual)
+		}
 	}
 }

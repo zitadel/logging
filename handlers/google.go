@@ -36,7 +36,7 @@ func constructLoggerAttributes(data map[string]interface{}) []slog.Attr {
 	if data["version"] != nil {
 		scValues = append(scValues, slog.String("version", data["version"].(string)))
 	}
-	return []slog.Attr{slog.Group("serviceContext", scValues...)}
+	return []slog.Attr{slog.Group("service_context", scValues...)}
 }
 
 type GoogleRecord struct {
@@ -44,43 +44,40 @@ type GoogleRecord struct {
 	Message        string         `json:"message"`
 	Severity       string         `json:"severity,omitempty"`
 	Type           string         `json:"@type,omitempty"`
-	AppContext     map[string]any `json:"appContext,omitempty"`
-	ServiceContext map[string]any `json:"serviceContext,omitempty"`
+	AppContext     map[string]any `json:"app_context,omitempty"`
+	ServiceContext map[string]any `json:"service_context,omitempty"`
+	StackTrace     string         `json:"stack_trace,omitempty"`
 }
 
 func (c *googleWriter) mapAttributes(jsonHandlerOutput map[string]interface{}) *GoogleRecord {
 	record := new(GoogleRecord)
 	record.Message = jsonHandlerOutput["msg"].(string)
 	record.Time = jsonHandlerOutput["time"].(string)
-
+	if trace, ok := jsonHandlerOutput["stack_trace"].(string); ok {
+		record.StackTrace = trace
+	}
 	var level slog.Level
 	if err := level.UnmarshalText([]byte(jsonHandlerOutput["level"].(string))); err != nil {
 		fmt.Println("Error unmarshalling level")
 	}
 	record.Severity = level.String()
-	var dropErrKey bool
-	if level >= slog.LevelError {
-		msg := record.Message
-		if err, ok := jsonHandlerOutput["err"]; ok {
-			msg = fmt.Sprintf("%s: %s", record.Message, err)
-		}
-		record.Type = googleErrorType
-		record.Message = msg
-		// On lower levels, we add the err field to the app context
-		dropErrKey = true
-	}
-
 	for key, value := range jsonHandlerOutput {
 		switch key {
-		case "level", "msg", "time":
-			// Don't add these to the app context, as they are top-level fields
-		case "serviceContext":
+		case "level", "msg", "time", "stack_trace":
+		// Don't add these to the app context, as they are top-level fields
+		case "service_context":
 			// Add this to the top level, not to the app context
 			record.ServiceContext = value.(map[string]any)
-		case "err":
-			if dropErrKey {
+		case "err", "error":
+			if level >= slog.LevelError {
+				if record.StackTrace != "" {
+					record.StackTrace = fmt.Sprintf("%s\n%s", record.Message, record.StackTrace)
+				}
+				record.Message = fmt.Sprintf("%s: %s", record.Message, jsonHandlerOutput[key])
+				record.Type = googleErrorType
 				break
 			}
+			// On lower levels, we add the err field to the app context
 			addToAppContext(record, key, value)
 		default:
 			addToAppContext(record, key, value)

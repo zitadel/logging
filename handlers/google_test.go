@@ -2,81 +2,62 @@ package handlers_test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
+	"github.com/zitadel/logging"
 	"github.com/zitadel/logging/handlers"
 	"io"
 	"log/slog"
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 )
 
+var callerFile = "handlers/google_test.go"
+
 func TestGoogleHandler(t *testing.T) {
-	logTime := time.Now()
 	tests := []struct {
-		name                     string
-		setupHandler             func(writer io.Writer) slog.Handler
-		record                   slog.Record
-		expectedOutput           map[string]interface{}
-		expectedStackStraceStart string
+		name                    string
+		handler                 func(writer io.Writer) slog.Handler
+		log                     func()
+		expectedOutput          map[string]interface{}
+		expectedStackTraceStart string
 	}{
 		{
-			name:         "Basic Handle",
-			setupHandler: func(writer io.Writer) slog.Handler { return handlers.NewGoogle(writer, nil, nil) },
-			record: slog.Record{
-				Time:    logTime,
-				Level:   slog.LevelInfo,
-				Message: "Test log message",
-			},
+			name:    "Basic Handle",
+			handler: func(writer io.Writer) slog.Handler { return handlers.NewGoogle(writer, nil, nil) },
+			log:     func() { logging.Info("Test log message") },
 			expectedOutput: map[string]interface{}{
-				"time":     logTime.Format(time.RFC3339Nano), // Update with dynamic time
 				"message":  "Test log message",
 				"severity": "INFO",
 			},
 		},
 		{
 			name: "WithAttrs adds attributes",
-			setupHandler: func(writer io.Writer) slog.Handler {
+			handler: func(writer io.Writer) slog.Handler {
 				return handlers.NewGoogle(writer, nil, nil).WithAttrs([]slog.Attr{
 					slog.String("key1", "value1"),
 					slog.Int("key2", 42),
 				})
 			},
-			record: slog.Record{
-				Time:    logTime,
-				Level:   slog.LevelInfo,
-				Message: "Log with attributes",
-			},
+			log: func() { logging.Info("Log with attributes") },
 			expectedOutput: map[string]interface{}{
-				"time":     logTime.Format(time.RFC3339Nano),
 				"message":  "Log with attributes",
 				"severity": "INFO",
-				"appContext": map[string]interface{}{
+				"app_context": map[string]interface{}{
 					"key1": "value1",
 					"key2": float64(42), // Numbers will be unmarshaled as float64
 				},
 			},
 		},
 		{
-			name: "WithGroup groups attributes",
-			setupHandler: func(writer io.Writer) slog.Handler {
-				return handlers.NewGoogle(writer, nil, nil).WithGroup("group1").WithAttrs([]slog.Attr{
-					slog.String("key", "value"),
-				})
-			},
-			record: slog.Record{
-				Time:    logTime,
-				Level:   slog.LevelInfo,
-				Message: "Log in group",
-			},
+			name:    "WithGroup groups attributes",
+			handler: func(writer io.Writer) slog.Handler { return handlers.NewGoogle(writer, nil, nil).WithGroup("group1") },
+			log:     func() { logging.Info("Log in group") },
 			expectedOutput: map[string]interface{}{
-				"time":     logTime.Format(time.RFC3339Nano),
 				"message":  "Log in group",
 				"severity": "INFO",
-				"appContext": map[string]interface{}{
+				"app_context": map[string]interface{}{
 					"group1": map[string]interface{}{
 						"key": "value",
 					},
@@ -85,21 +66,14 @@ func TestGoogleHandler(t *testing.T) {
 		},
 		{
 			name: "WithGroup nested groups",
-			setupHandler: func(writer io.Writer) slog.Handler {
-				return handlers.NewGoogle(writer, nil, nil).WithGroup("group1").WithGroup("group2").WithAttrs([]slog.Attr{
-					slog.String("key", "value"),
-				})
+			handler: func(writer io.Writer) slog.Handler {
+				return handlers.NewGoogle(writer, nil, nil).WithGroup("group1").WithGroup("group2")
 			},
-			record: slog.Record{
-				Time:    logTime,
-				Level:   slog.LevelInfo,
-				Message: "Log in nested group",
-			},
+			log: func() { logging.Info("Log in nested group") },
 			expectedOutput: map[string]interface{}{
-				"time":     logTime.Format(time.RFC3339Nano),
 				"message":  "Log in nested group",
 				"severity": "INFO",
-				"appContext": map[string]interface{}{
+				"app_context": map[string]interface{}{
 					"group1": map[string]interface{}{
 						"group2": map[string]interface{}{
 							"key": "value",
@@ -109,107 +83,79 @@ func TestGoogleHandler(t *testing.T) {
 			},
 		},
 		{
-			name: "LevelError adds error type and stack trace",
-			setupHandler: func(writer io.Writer) slog.Handler {
-				return handlers.NewGoogle(writer, nil, nil).WithAttrs([]slog.Attr{
-					slog.Any("err", errors.New("error message")),
-				})
-			},
-			record: slog.Record{
-				Time:    logTime,
-				Level:   slog.LevelError,
-				Message: "an error happened",
-			},
+			name:    "LevelError adds error type and stack trace",
+			handler: func(writer io.Writer) slog.Handler { return handlers.NewGoogle(writer, nil, nil) },
+			log:     func() { logging.OnError(errors.New("error message")).Error("an error happened") },
 			expectedOutput: map[string]interface{}{
-				"time":     logTime.Format(time.RFC3339Nano),
 				"message":  "an error happened: error message",
 				"severity": "ERROR",
 				"@type":    "type.googleapis.com/google.devtools.clouderrorreporting.v1beta1.ReportedErrorEvent",
 			},
-			expectedStackStraceStart: "an error happened\ngoroutine",
+			expectedStackTraceStart: "an error happened\ngithub.com/zitadel/logging/handlers_test.TestGoogleHandler",
 		},
 		{
 			name: "Service and version are added to the service context group",
-			setupHandler: func(writer io.Writer) slog.Handler {
+			handler: func(writer io.Writer) slog.Handler {
 				return handlers.NewGoogle(writer, nil, map[string]interface{}{
 					"service": "test-service",
 					"version": "1.0.0",
 				})
 			},
-			record: slog.Record{
-				Time:    logTime,
-				Level:   slog.LevelInfo,
-				Message: "Log with service context",
-			},
+			log: func() { logging.Info("Log with service context") },
 			expectedOutput: map[string]interface{}{
-				"time":     logTime.Format(time.RFC3339Nano),
 				"message":  "Log with service context",
 				"severity": "INFO",
-				"serviceContext": map[string]interface{}{
+				"service_context": map[string]interface{}{
 					"service": "test-service",
 					"version": "1.0.0",
 				},
 			},
 		},
 		{
-			name: "Service and version are not added to the service context group if missing",
-			setupHandler: func(writer io.Writer) slog.Handler {
-				return handlers.NewGoogle(writer, nil, map[string]interface{}{})
-			},
-			record: slog.Record{
-				Time:    logTime,
-				Level:   slog.LevelInfo,
-				Message: "Log without service context",
-			},
+			name:    "err field on info level is unchanged",
+			handler: func(writer io.Writer) slog.Handler { return handlers.NewGoogle(writer, nil, nil) },
+			log:     func() { logging.Info("Info log with err field", "err", errors.New("error message")) },
 			expectedOutput: map[string]interface{}{
-				"time":     logTime.Format(time.RFC3339Nano),
-				"message":  "Log without service context",
-				"severity": "INFO",
-			},
-		},
-		{
-			name: "err field on info level is unchanged",
-			setupHandler: func(writer io.Writer) slog.Handler {
-				return handlers.NewGoogle(writer, nil, nil).WithAttrs([]slog.Attr{
-					slog.Any("err", errors.New("error message")),
-				})
-			},
-			record: slog.Record{
-				Time:    logTime,
-				Level:   slog.LevelInfo,
-				Message: "Info log with err field",
-			},
-			expectedOutput: map[string]interface{}{
-				"time":     logTime.Format(time.RFC3339Nano),
 				"message":  "Info log with err field",
 				"severity": "INFO",
-				"appContext": map[string]interface{}{
+				"app_context": map[string]interface{}{
 					"err": "error message",
 				},
 			},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.name, func(tt *testing.T) {
 			var buf bytes.Buffer
-			handler := tt.setupHandler(&buf)
-			err := handler.Handle(context.Background(), tt.record)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			slog.SetDefault(slog.New(test.handler(&buf)))
+			test.log()
 			var actual map[string]interface{}
 			if err := json.Unmarshal(buf.Bytes(), &actual); err != nil {
-				t.Fatalf("failed to unmarshal log: %v", err)
+				tt.Fatalf("failed to unmarshal log: %v", err)
 			}
-			if tt.expectedStackStraceStart != "" {
-				if !strings.HasPrefix(actual["stack_trace"].(string), tt.expectedStackStraceStart) {
-					t.Errorf("expected stack trace to start with %q, got: %q", tt.expectedStackStraceStart, actual["stack_trace"])
+			if logtime, ok := actual["time"]; !ok || logtime == "" {
+				tt.Errorf("expected time field, got: %q", logtime)
+			}
+			// We want to use reflect.DeepEqual later, so we remove the dynamic "time" field
+			delete(actual, "time")
+			if test.expectedStackTraceStart != "" {
+				if stackTrace, ok := actual["stack_trace"]; !ok || !strings.HasPrefix(stackTrace.(string), test.expectedStackTraceStart) {
+					tt.Errorf("expected stack trace in %+v to start with %q, got: %q", actual, test.expectedStackTraceStart, stackTrace)
 				}
-				// Remove the stack trace from the actual output, so we can use reflect.DeepEqual later
-				delete(actual, "stack_trace")
 			}
-			if !reflect.DeepEqual(actual, tt.expectedOutput) {
-				t.Errorf("expected output: %+v, got: %+v", tt.expectedOutput, actual)
+			// We want to use reflect.DeepEqual later, so we remove the dynamic "stack_trace" field
+			delete(actual, "stack_trace")
+			if caller, ok := actual["app_context"].(map[string]interface{})["caller"]; !ok || !strings.Contains(caller.(string), callerFile) {
+				tt.Errorf("expected caller in %+v to contain %q, got: %q", actual, callerFile, caller)
+			}
+			// We want to use reflect.DeepEqual later, so we remove the dynamic "caller" field
+			delete(actual["app_context"].(map[string]interface{}), "caller")
+			// We delete an empty appContext so we don't have to expect
+			if appContext, ok := actual["app_context"]; ok && len(appContext.(map[string]interface{})) == 0 {
+				delete(actual, "app_context")
+			}
+			if !reflect.DeepEqual(actual, test.expectedOutput) {
+				tt.Errorf("expected output: %+v, got: %+v", test.expectedOutput, actual)
 			}
 		})
 	}

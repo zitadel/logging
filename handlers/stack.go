@@ -11,32 +11,32 @@ import (
 
 const skipKey = "stack_handler_internal_caller_skip"
 
-var _ slog.Handler = (*stackHandler)(nil)
+var _ slog.Handler = (*StackHandler)(nil)
 
-type stackHandler struct {
+type StackHandler struct {
 	wrapped slog.Handler
 }
 
-// AddCallerAndStack wraps a handler and adds a stack trace to the log entry.
-func AddCallerAndStack(handler slog.Handler) slog.Handler {
-	return &stackHandler{wrapped: handler}
+// AddCallerAndStack wraps a wrapped and adds a stack trace to the log entry.
+func AddCallerAndStack(handler slog.Handler) *StackHandler {
+	return &StackHandler{wrapped: handler}
 }
 
-func (s *stackHandler) Enabled(ctx context.Context, level slog.Level) bool {
+func (s *StackHandler) Enabled(ctx context.Context, level slog.Level) bool {
 	return s.wrapped.Enabled(ctx, level)
 }
 
-func (s *stackHandler) Handle(ctx context.Context, record slog.Record) error {
+func (s *StackHandler) Handle(ctx context.Context, record slog.Record) error {
 	record = withCaller(record)
 	record = replaceInternalKey(record, record.Level >= slog.LevelError)
 	return s.wrapped.Handle(ctx, record)
 }
 
-func (s *stackHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+func (s *StackHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	return s.wrapped.WithAttrs(attrs)
 }
 
-func (s *stackHandler) WithGroup(name string) slog.Handler {
+func (s *StackHandler) WithGroup(name string) slog.Handler {
 	return s.wrapped.WithGroup(name)
 }
 

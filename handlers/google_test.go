@@ -17,10 +17,10 @@ var callerFile = "handlers/google_test.go"
 func TestGoogleHandler(t *testing.T) {
 	tests := []struct {
 		name                    string
-		handlerOptions          map[string]interface{}
+		config                  map[string]any
 		log                     func()
-		expectedOutput          map[string]interface{}
 		expectedStackTraceStart string
+		expectedOutput          map[string]interface{}
 	}{
 		{
 			name: "Basic Handle",
@@ -86,7 +86,7 @@ func TestGoogleHandler(t *testing.T) {
 		},
 		{
 			name: "Service and version are added to the service context group",
-			handlerOptions: map[string]interface{}{
+			config: map[string]any{
 				"service": "test-service",
 				"version": "1.0.0",
 			},
@@ -118,7 +118,10 @@ func TestGoogleHandler(t *testing.T) {
 		t.Run(test.name, func(tt *testing.T) {
 			var buf bytes.Buffer
 			var handler slog.Handler
-			handler = handlers.NewGoogle(&buf, nil, test.handlerOptions)
+			handler = slog.NewJSONHandler(&buf, &slog.HandlerOptions{
+				ReplaceAttr: handlers.ReplaceAttrForGoogleFunc(nil),
+			})
+			handler = handlers.ForGoogleCloudLogging(handler, test.config)
 			if test.expectedStackTraceStart != "" {
 				handler = handlers.AddCallerAndStack(handler)
 			}
@@ -139,7 +142,11 @@ func TestGoogleHandler(t *testing.T) {
 				}
 				// We want to use reflect.DeepEqual later, so we remove the dynamic "stack_trace" field
 				delete(actual, "stack_trace")
-				if caller, ok := actual["app_context"].(map[string]interface{})["caller"]; !ok || !strings.Contains(caller.(string), callerFile) {
+				appContext, ok := actual["app_context"]
+				if !ok {
+					tt.Fatalf("expected app_context in %+v, got none", actual)
+				}
+				if caller, ok := appContext.(map[string]interface{})["caller"]; !ok || !strings.Contains(caller.(string), callerFile) {
 					tt.Errorf("expected caller in %+v to contain %q, got: %q", actual, callerFile, caller)
 				}
 				// We want to use reflect.DeepEqual later, so we remove the dynamic "caller" field

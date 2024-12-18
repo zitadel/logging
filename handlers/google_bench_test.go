@@ -27,7 +27,7 @@ func BenchmarkHandlers(b *testing.B) {
 	// Benchmark GoogleHandler
 	b.Run("GoogleHandler", func(b *testing.B) {
 		var buf bytes.Buffer
-		handler := handlers.NewGoogle(&buf, nil, nil).WithAttrs(attrs)
+		handler := handlers.ForGoogleCloudLogging(slog.NewJSONHandler(&buf, nil), nil).WithAttrs(attrs)
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {

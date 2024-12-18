@@ -34,24 +34,33 @@ func (c *Config) Slog() *slog.Logger {
 		return logger
 	}
 	opts := &slog.HandlerOptions{
-		AddSource:   c.AddSource,
+		AddSource:   false,
 		Level:       level,
 		ReplaceAttr: c.fieldMapToPlaceKey(),
 	}
-
+	if c.Formatter.Format == FormatterGoogle {
+		opts.ReplaceAttr = handlers.ReplaceAttrForGoogleFunc(c.fieldMapToPlaceKey())
+	}
+	var handler slog.Handler
 	switch c.Formatter.Format {
 	case FormatterText:
-		return slog.New(slog.NewTextHandler(os.Stderr, opts))
-	case FormatterJSON:
-		return slog.New(slog.NewJSONHandler(os.Stderr, opts))
-	case FormatterGoogle:
-		return slog.New(handlers.NewGoogle(os.Stderr, opts, c.Formatter.Data))
+		handler = slog.NewTextHandler(os.Stderr, opts)
+	case FormatterJSON, FormatterGoogle:
+		handler = slog.NewJSONHandler(os.Stderr, opts)
 	case "":
 		logger.Warn("no slog format in config, using text handler")
 	default:
 		logger.Warn("unknown slog format in config, using text handler", "format", c.Formatter.Format)
 	}
-	return slog.New(slog.NewTextHandler(os.Stderr, opts))
+	if c.Formatter.Format == FormatterGoogle {
+		handler = handlers.ForGoogleCloudLogging(handler, c.Formatter.Data)
+	}
+	if c.AddSource {
+		// The order matters.
+		// If AddCallerAndStack wraps the GoogleHandler, the caller field is added to the app context.
+		handler = handlers.AddCallerAndStack(handler)
+	}
+	return slog.New(handler)
 }
 
 func (c *Config) fieldMapToPlaceKey() func(groups []string, a slog.Attr) slog.Attr {

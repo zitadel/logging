@@ -1,117 +1,109 @@
 package handlers
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
-	"io"
 	"log/slog"
 )
 
 // Constants for magic strings
 const googleErrorType = "type.googleapis.com/google.devtools.clouderrorreporting.v1beta1.ReportedErrorEvent"
 
-func NewGoogle(w io.Writer, options *slog.HandlerOptions, data map[string]interface{}) slog.Handler {
-	gWriter := &googleWriter{writer: w}
-	var handler slog.Handler
-	handler = slog.NewJSONHandler(gWriter, options)
-	loggerAttributes := constructLoggerAttributes(data)
-	if len(loggerAttributes) > 0 {
-		handler = handler.WithAttrs(loggerAttributes)
-	}
-	return handler
+var _ slog.Handler = (*GoogleHandler)(nil)
+
+type GoogleHandler struct {
+	wrapped        slog.Handler
+	serviceContext *slog.Attr
 }
 
-// Helper to construct ServiceContext
-func constructLoggerAttributes(data map[string]interface{}) []slog.Attr {
+func ReplaceAttrForGoogleFunc(runAfterGoogleReplacements func([]string, slog.Attr) slog.Attr) func(groups []string, a slog.Attr) slog.Attr {
+	after := func(groups []string, a slog.Attr) slog.Attr { return a }
+	if runAfterGoogleReplacements != nil {
+		after = runAfterGoogleReplacements
+	}
+	return func(groups []string, a slog.Attr) slog.Attr {
+		switch a.Key {
+		case "level":
+			a.Key = "severity"
+		case "msg":
+			a.Key = "message"
+		}
+		return after(groups, a)
+	}
+}
+
+func ForGoogleCloudLogging(handler slog.Handler, configData map[string]any) *GoogleHandler {
+	return &GoogleHandler{
+		wrapped:        handler,
+		serviceContext: constructLoggerAttributes(configData),
+	}
+}
+
+// constructLoggerAttributes is a helper to construct ServiceContext
+func constructLoggerAttributes(data map[string]interface{}) *slog.Attr {
 	if data == nil {
 		return nil
 	}
 	if data["service"] == nil && data["version"] == nil {
 		return nil
 	}
-	scValues := make([]any, 0, 2)
-	if data["service"] != nil {
-		scValues = append(scValues, slog.String("service", data["service"].(string)))
+	var scAttr []any
+	if service, ok := data["service"]; ok && service != "" {
+		scAttr = append(scAttr, slog.String("service", service.(string)))
 	}
-	if data["version"] != nil {
-		scValues = append(scValues, slog.String("version", data["version"].(string)))
+	if version, ok := data["version"]; ok && version != "" {
+		scAttr = append(scAttr, slog.String("version", version.(string)))
 	}
-	return []slog.Attr{slog.Group("service_context", scValues...)}
+	if len(scAttr) == 0 {
+		return nil
+	}
+	sc := slog.Group("service_context", scAttr...)
+	return &sc
 }
 
-type GoogleRecord struct {
-	Time           string         `json:"time"`
-	Message        string         `json:"message"`
-	Severity       string         `json:"severity,omitempty"`
-	Type           string         `json:"@type,omitempty"`
-	AppContext     map[string]any `json:"app_context,omitempty"`
-	ServiceContext map[string]any `json:"service_context,omitempty"`
-	StackTrace     string         `json:"stack_trace,omitempty"`
+func (g *GoogleHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	return g.wrapped.Enabled(ctx, level)
 }
 
-func (c *googleWriter) mapAttributes(jsonHandlerOutput map[string]interface{}) *GoogleRecord {
-	record := new(GoogleRecord)
-	record.Message = jsonHandlerOutput["msg"].(string)
-	record.Time = jsonHandlerOutput["time"].(string)
-	if trace, ok := jsonHandlerOutput["stack_trace"].(string); ok {
-		record.StackTrace = trace
+func (g *GoogleHandler) Handle(ctx context.Context, record slog.Record) error {
+	newAttrs := make([]slog.Attr, 0, 2)
+	if g.serviceContext != nil {
+		newAttrs = append(newAttrs, *g.serviceContext)
 	}
-	var level slog.Level
-	if err := level.UnmarshalText([]byte(jsonHandlerOutput["level"].(string))); err != nil {
-		fmt.Println("Error unmarshalling level")
+	if record.Level >= slog.LevelError {
+		newAttrs = append(newAttrs, slog.String("@type", googleErrorType))
 	}
-	record.Severity = level.String()
-	for key, value := range jsonHandlerOutput {
-		switch key {
-		case "level", "msg", "time", "stack_trace":
-		// Don't add these to the app context, as they are top-level fields
-		case "service_context":
-			// Add this to the top level, not to the app context
-			record.ServiceContext = value.(map[string]any)
+	appContextAttrs := make([]any, 0, record.NumAttrs())
+	originalMessage := record.Message
+	record.Attrs(func(a slog.Attr) bool {
+		switch a.Key {
 		case "err", "error":
-			if level >= slog.LevelError {
-				if record.StackTrace != "" {
-					record.StackTrace = fmt.Sprintf("%s\n%s", record.Message, record.StackTrace)
-				}
-				record.Message = fmt.Sprintf("%s: %s", record.Message, jsonHandlerOutput[key])
-				record.Type = googleErrorType
-				break
+			if record.Level >= slog.LevelError {
+				record.Message = fmt.Sprintf("%s: %s", record.Message, a.Value)
+				return true
 			}
-			// On lower levels, we add the err field to the app context
-			addToAppContext(record, key, value)
-		default:
-			addToAppContext(record, key, value)
+		case "stack_trace":
+			// Stays top level
+			newAttrs = append(newAttrs, slog.String("stack_trace", fmt.Sprintf("%s\n%s", originalMessage, a.Value)))
+			return true
 		}
+		appContextAttrs = append(appContextAttrs, a)
+		return true
+	})
+	if len(appContextAttrs) > 0 {
+		newAttrs = append(newAttrs, slog.Group("app_context", appContextAttrs...))
 	}
-	return record
+	newRecord := slog.NewRecord(record.Time, record.Level, record.Message, record.PC)
+	newRecord.AddAttrs(newAttrs...)
+	return g.wrapped.Handle(ctx, newRecord)
 }
 
-func addToAppContext(record *GoogleRecord, key string, value interface{}) {
-	if record.AppContext == nil {
-		record.AppContext = make(map[string]any)
-	}
-	record.AppContext[key] = value
+func (g *GoogleHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	g.wrapped = g.wrapped.WithAttrs(attrs)
+	return g
 }
 
-type googleWriter struct {
-	writer io.Writer
-}
-
-func (g *googleWriter) Write(p []byte) (n int, err error) {
-	// Unmarshal the JSON into a map
-	var logEntry map[string]interface{}
-	if err := json.Unmarshal(p, &logEntry); err != nil {
-		return 0, fmt.Errorf("failed to unmarshal log entry: %w", err)
-	}
-
-	record := g.mapAttributes(logEntry)
-
-	// Marshal the modified log entry back into JSON
-	modifiedJSON, err := json.Marshal(record)
-	if err != nil {
-		return 0, fmt.Errorf("failed to marshal modified log entry: %w", err)
-	}
-
-	// Write the modified JSON to the underlying writer
-	return g.writer.Write(append(modifiedJSON, '\n'))
+func (g *GoogleHandler) WithGroup(name string) slog.Handler {
+	g.wrapped = g.wrapped.WithGroup(name)
+	return g
 }

@@ -6,122 +6,115 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 
+// Because record versions are enumed, deserializing and handling many record versions is easy.
+// for example:
+// serializedJsonString = `{"record_v1":{ "message":"a record" }}`
+// record := &Record
+// jsonproto.Unmarshal(serializedJsonString, record)
+// switch r := (record.Record.(type)) {
+//    case: *RecordV1:
+//      fmt.Println("msg", r.GetMessage())
+//    case: *RecordV2:
+//      fmt.Println("msg", r.GetText())
+// }
 message Record {
   oneof record {
     RecordV1 record_v1 = 1;
+    // RecordV2 record_v2 = 2;
   }
 }
 
 message RecordV1 {
   google.protobuf.Timestamp time = 1;
+  // Severity numbers are inspired by OTEL severity numbers.
+  // https://opentelemetry.io/docs/specs/otel/logs/data-model/#mapping-of-severitynumber
+  // The gaps allow to insert special levels in the future.
+  enum Severity {
+    SeverityUndefined = 0;
+    reserved 1 to 3;
+    Trace = 4;
+    reserved 5 to 7;
+    Debug = 8;
+    reserved 9 to 11;
+    Info = 12;
+    reserved 13 to 15;
+    Warn = 16;
+    reserved 17 to 19;
+    Error = 20;
+    reserved 21 to 23;
+    Fatal = 24;
+  }
   Severity severity = 2;
   string message = 3;
   optional string service = 4;
   optional string version = 5;
-  optional string process_id = 6; // for example pod ID
+  optional string process = 6; // for example pod ID
   optional string instance_id = 7;
   google.protobuf.Struct dynamic = 8;
   repeated string stack_trace = 9;
   optional string trace_id = 10;
   optional string span_id = 11;
   reserved 12 to 29;
-  oneof http {
-    // http_v1 is provided for all requests served by the service
-    HTTPRequestV1 http_v1 = 30;
+  message HTTPRequest {
+    string protocol = 1;
+    string host = 2;
+    string path = 3;
+    enum Method {
+      MethodUndefined = 0;
+      GET = 1;
+      POST = 2;
+      PUT = 3;
+      PATCH = 4;
+      DELETE = 5;
+      reserved 6 to 18;
+      OTHER = 19;
+    }
+    Method method = 4;
+    int32 status = 5;
+    string referer = 6;
+    string userAgent = 7;
+    string remote_ip = 8;
+    message Message {
+      map<string,string> headers = 1;
+      optional bytes request_body = 2;
+      uint64 bytes = 3;
+    }
+    optional Message request = 9;
+    optional Message response = 10;
+    google.protobuf.Duration latency = 17;
   }
-  reserved 31 to 39;
-  oneof api {
-    // api_v1 is only provided if the request was served by the services API
-    APIRequestV1 api_v1 = 40;
+
+  message APICall {
+    string service = 1;
+    string method = 2;
+    optional string resource = 3;
   }
-  reserved 41 to 49;
-  oneof user {
-    // user_v1 is provided if the user is either authenticated
-    // or if the record describes a failed authentication attempt
-    UserV1 user_v1 = 50;
+
+  message Authorization {
+    string user_id = 1;
+    string org_id = 2;
+    optional string client_id = 6;
+    optional string project_id = 7;
   }
-  // reserved 50 to 59;
-  // oneof event {
-    // EventV1 event_v1 = 60;
-  // }
-}
 
-// Severity numbers are inspired by OTEL severity numbers.
-// https://opentelemetry.io/docs/specs/otel/logs/data-model/#mapping-of-severitynumber
-// The gaps allow to insert special levels in the future.
-enum Severity {
-  SeverityUnspecified = 0;
-  reserved 1 to 3;
-  Trace = 4;
-  reserved 5 to 7;
-  Debug = 8;
-  reserved 9 to 11;
-  Info = 12;
-  reserved 13 to 15;
-  Warn = 16;
-  reserved 17 to 19;
-  Error = 20;
-  reserved 21 to 23;
-  Fatal = 24;
-}
-
-message HTTPRequestV1 {
-  string protocol = 1;
-  string host = 2;
-  string path = 3;
-  HTTPMethod method = 4;
-  int32 status = 5;
-  string referer = 6;
-  string userAgent = 7;
-  string remote_ip = 8;
-  optional bool is_system_user = 9;
-  optional bytes request_body = 10;
-  map<string,string> request_headers = 11;
-  uint64 request_bytes = 12;
-  map<string,string> response_headers = 13;
-  optional bytes response_body = 14;
-  uint64 response_bytes = 15;
-  google.protobuf.Duration latency = 16;
-}
-
-enum HTTPMethod {
-  HTTPMethodUndefined = 0;
-  GET = 1;
-  POST = 2;
-  PUT = 3;
-  PATCH = 4;
-  DELETE = 5;
-  reserved 6 to 18;
-  OTHER = 19;
-}
-
-message APIRequestV1 {
-  string service = 1;
-  string method = 2;
-  optional string resource = 3;
-}
-
-message UserV1 {
-  string user_id = 1;
-  string org_id = 2;
-  AuthMethod method = 3;
-  // is_successful_authentication is only provided if method is >= SystemUserToken
-  optional bool is_successful_authentication = 4;
-  // is_system_user is true or false if method is AlreadyAuthenticated
-  // It is always true if method is SystemUserToken
-  // It is always false if method is OIDCAccessToken, OIDCRefreshToken, SessionAPI and SAMLResponse
-  optional bool is_system_user = 5;
-  optional string client_id = 6;
-  optional string project_id = 7;
-}
-
-enum AuthMethod {
-  AuthMethodUnspecified = 0;
-  AlreadyAuthenticated = 1;
-  Unauthenticated = 2;
-  SystemUserToken = 3;
-  OIDCAccessToken = 4;
-  OIDCRefreshToken = 5;
-  SessionAPI = 6;
-  SAMLResponse = 7;
+  message Authentication {
+    enum Method {
+      MethodUndefined = 0;
+      SystemUserToken = 1;
+      OIDCAccessToken = 2;
+      OIDCRefreshToken = 3;
+      SessionAPI = 4;
+      SAMLResponse = 5;
+    }
+    Method method = 3;
+    optional bool success = 4;
+  }
+  oneof stream {
+    HTTPRequest http = 30;
+    APICall api = 31;
+    Authentication authn = 33;
+    Authorization authz = 32;
+    // Event event = 33;
+    // Action action = 34;
+  }
 }

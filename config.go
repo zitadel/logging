@@ -44,7 +44,7 @@ func (c *Config) Slog() *slog.Logger {
 	case FormatterJSON:
 		handler = slog.NewJSONHandler(os.Stderr, opts)
 	case FormatterZitadel:
-		handler = NewZitadelHandler(os.Stderr, opts, "my service", "my version", "my pod id")
+		handler = NewZitadelHandler(os.Stderr, opts, "my service", "my version", "my pod id", map[string]any{"region": "AU1"})
 	case "":
 		logger.Warn("no slog format in config, using text handler")
 	default:

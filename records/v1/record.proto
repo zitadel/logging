@@ -1,0 +1,137 @@
+syntax = "proto3";
+
+option go_package = "github.com/zitadel/logging/records/v1;record_v1";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/descriptor.proto";
+
+// Custom option for marking sensitive fields.
+// This allows redacting these fields.
+extend google.protobuf.FieldOptions {
+  bool sensitive = 50001;
+}
+
+// Custom option for marking personally identifiable information.
+// This allows randomizing these fields.
+extend google.protobuf.FieldOptions {
+  bool pii = 50002;
+}
+
+message Record {
+  google.protobuf.Timestamp time = 1;
+  // Severity numbers are inspired by OTEL severity numbers.
+  // https://opentelemetry.io/docs/specs/otel/logs/data-model/#mapping-of-severitynumber
+  // The gaps allow to insert special levels in the future.
+  enum Severity {
+    SeverityUndefined = 0;
+    reserved 1 to 3;
+    Trace = 4;
+    reserved 5 to 7;
+    Debug = 8;
+    reserved 9 to 11;
+    Info = 12;
+    reserved 13 to 15;
+    Warn = 16;
+    reserved 17 to 19;
+    Error = 20;
+    reserved 21 to 23;
+    Fatal = 24;
+  }
+  Severity severity = 2;
+  string message = 3;
+  optional string service = 4; // for example "zitadel"
+  optional string version = 5; // for example "v2.68.0"
+  optional string process = 6; // for example the Kubernetes pod ID
+  optional string instance_id = 7; // The zitadel instance ID.
+  google.protobuf.Struct dynamic = 8; // Dynamically typed fields that add additional information
+  // stack_trace is always added for logs with:
+  // - level >= Error
+  // - level <= Trace
+  repeated string stack_trace = 9;
+  // trace_id is added to all request_scoped logs
+  // within a requests scope, trace_id doesn't change
+  optional string trace_id = 10;
+  // span_id is added to all request_scoped logs
+  optional string span_id = 11;
+  reserved 12 to 29;
+  message Exception {
+    optional string id = 1; // The ZitadelError id
+    optional string key = 2; // The ZitadelError i18n key
+    string description = 3 [ // The error message
+      (sensitive) = true,
+      (pii) = true
+    ];
+  }
+  message HTTPRequest {
+    string protocol = 1;
+    string host = 2;
+    string path = 3;
+    enum Method {
+      MethodUndefined = 0;
+      GET = 1;
+      POST = 2;
+      PUT = 3;
+      PATCH = 4;
+      DELETE = 5;
+    }
+    Method method = 4;
+    int32 status = 5;
+    string referer = 6;
+    string userAgent = 7 [(pii) = true];
+    string remote_ip = 8 [(pii) = true];
+    message Message {
+      map<string,string> headers = 1 [
+        (sensitive) = true,
+        (pii) = true
+      ];
+      optional bytes body = 2 [
+        (sensitive) = true,
+        (pii) = true
+      ];
+      uint64 bytes = 3;
+    }
+    optional Message request = 9;
+    optional Message response = 10;
+    google.protobuf.Duration latency = 17;
+    optional string user_id = 18 [(pii) = true];
+  }
+  message Authentication {
+    optional string user_id = 1 [(pii) = true];
+    enum Method {
+      MethodUndefined = 0;
+      SystemUserToken = 1;
+      OIDCAccessToken = 2;
+      OIDCRefreshToken = 3;
+      SessionAPI = 4;
+      SAMLResponse = 5;
+    }
+    Method method = 2;
+    bool success = 3;
+  }
+  message Authorization {
+    string user_id = 1 [(pii) = true];
+    string org_id = 2;
+    optional string client_id = 3;
+    optional string project_id = 4;
+    bool success = 5;
+  }
+  message APICall {
+    string user_id = 1 [(pii) = true];
+    string org_id = 2;
+    string service = 3;
+    string method = 4;
+    optional string resource = 5;
+    int32 status = 6;
+  }
+  oneof stream {
+    Exception exception = 30;
+    HTTPRequest http = 31;
+    APICall api = 32;
+    Authentication authn = 33;
+    Authorization authz = 34;
+    // Event event = 35;
+    // Action action = 36;
+  }
+}

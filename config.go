@@ -3,6 +3,10 @@ package logging
 import (
 	"log/slog"
 	"os"
+
+	"google.golang.org/protobuf/proto"
+
+	"github.com/zitadel/logging/records/v1"
 )
 
 type Config struct {
@@ -44,7 +48,9 @@ func (c *Config) Slog() *slog.Logger {
 	case FormatterJSON:
 		handler = slog.NewJSONHandler(os.Stderr, opts)
 	case FormatterZitadel:
-		handler = NewZitadelHandler(os.Stderr, opts, "my service", "my version", "my pod id", map[string]any{"region": "AU1"})
+		handler = record_v1.NewZitadelHandler(os.Stderr, opts, func(record *record_v1.Record) proto.Message {
+			return &VersionedRecord{Record: &VersionedRecord_RecordV1{RecordV1: record}}
+		}, "my service", "my version", "my pod id", map[string]any{"region": "AU1"})
 	case "":
 		logger.Warn("no slog format in config, using text handler")
 	default:

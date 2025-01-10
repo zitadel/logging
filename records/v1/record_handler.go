@@ -1,8 +1,9 @@
-package logging
+package record_v1
 
 import (
 	"context"
 	"fmt"
+	"google.golang.org/protobuf/proto"
 	"io"
 	"log/slog"
 	"runtime"
@@ -18,16 +19,20 @@ var _ slog.Handler = (*ZitadelHandler)(nil)
 type ZitadelHandler struct {
 	w                         io.Writer
 	opt                       *slog.HandlerOptions
+	wrap                      WrapRecordFunc
 	service, version, process string
 	dynamic                   map[string]any
 }
 
+type WrapRecordFunc func(record *Record) proto.Message
+
 // NewZitadelHandler creates a new ZitadelHandler.
 // It writes structured JSON records to w.
-func NewZitadelHandler(w io.Writer, opt *slog.HandlerOptions, service, version, process string, dynamic map[string]any) *ZitadelHandler {
+func NewZitadelHandler(w io.Writer, opt *slog.HandlerOptions, wrap WrapRecordFunc, service, version, process string, dynamic map[string]any) *ZitadelHandler {
 	return &ZitadelHandler{
 		w:       w,
 		opt:     opt,
+		wrap:    wrap,
 		service: service,
 		version: version,
 		process: process,
@@ -50,10 +55,14 @@ func (z *ZitadelHandler) WithGroup(string) slog.Handler {
 // Handle processes each slog.Record and writes it as a protobuf-serialized message.
 func (z *ZitadelHandler) Handle(ctx context.Context, r slog.Record) error {
 	protoRecord, err := z.mapRecordToProto(ctx, r)
+	var protoMessage proto.Message = protoRecord
 	if err != nil {
 		return fmt.Errorf("failed to map record to proto message: %v", err)
 	}
-	recordJson, err := protojson.Marshal(protoRecord)
+	if z.wrap != nil {
+		protoMessage = z.wrap(protoRecord)
+	}
+	recordJson, err := protojson.Marshal(protoMessage)
 	if err != nil {
 		return fmt.Errorf("failed to marshal proto message to JSON: %w", err)
 	}
@@ -63,18 +72,18 @@ func (z *ZitadelHandler) Handle(ctx context.Context, r slog.Record) error {
 
 // toSeverity maps slog.Level to Severity
 // Severity implements slog.StringerValuer
-func toSeverity(level slog.Level) RecordV1_Severity {
+func toSeverity(level slog.Level) Record_Severity {
 	switch level {
 	case slog.LevelDebug:
-		return RecordV1_Debug
+		return Record_Debug
 	case slog.LevelInfo:
-		return RecordV1_Info
+		return Record_Info
 	case slog.LevelWarn:
-		return RecordV1_Warn
+		return Record_Warn
 	case slog.LevelError:
-		return RecordV1_Error
+		return Record_Error
 	default:
-		return RecordV1_SeverityUndefined
+		return Record_SeverityUndefined
 	}
 }
 
@@ -98,7 +107,7 @@ func addStackTrace(slogPC uintptr) []string {
 // mapRecordToProto maps slog.Record to a Protobuf Record.
 func (z *ZitadelHandler) mapRecordToProto(ctx context.Context, r slog.Record) (*Record, error) {
 	severity := toSeverity(r.Level)
-	record := &RecordV1{
+	record := &Record{
 		Time:     timestamppb.New(r.Time),
 		Severity: severity,
 		Message:  r.Message,
@@ -121,23 +130,21 @@ func (z *ZitadelHandler) mapRecordToProto(ctx context.Context, r slog.Record) (*
 			record.addDynamic(slog.Any(k, v))
 		}
 	}
-	if severity >= RecordV1_Error || severity == RecordV1_Trace {
+	if severity >= Record_Error || severity <= Record_Trace {
 		record.StackTrace = addStackTrace(r.PC)
 	}
 	r.Attrs(func(attr slog.Attr) bool {
-		if streamValue, ok := attr.Value.Any().(isRecordV1_Stream); ok {
+		if streamValue, ok := attr.Value.Any().(isRecord_Stream); ok {
 			record.Stream = streamValue
 			return true
 		}
 		record.addDynamic(attr)
 		return true
 	})
-	return &Record{
-		Record: &Record_RecordV1{RecordV1: record},
-	}, nil
+	return record, nil
 }
 
-func (r *RecordV1) addDynamic(attr slog.Attr) {
+func (r *Record) addDynamic(attr slog.Attr) {
 	if r.Dynamic == nil {
 		r.Dynamic = &structpb.Struct{}
 	}

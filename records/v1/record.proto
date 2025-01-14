@@ -41,21 +41,28 @@ message Record {
   }
   Severity severity = 2;
   string message = 3;
-  optional string service = 4; // for example "zitadel"
-  optional string version = 5; // for example "v2.68.0"
-  optional string process = 6; // for example the Kubernetes pod ID
-  optional string instance_id = 7; // The zitadel instance ID.
-  google.protobuf.Struct dynamic = 8; // Dynamically typed fields that add additional information
+  optional string instance_id = 4; // The zitadel instance ID.
+  google.protobuf.Struct dynamic = 5; // Dynamically typed fields that add additional information
   // stack_trace is always added for logs with:
   // - level >= Error
   // - level <= Trace
-  repeated string stack_trace = 9;
+  repeated string stack_trace = 6;
   // trace_id is added to all request_scoped logs
   // within a requests scope, trace_id doesn't change
-  optional string trace_id = 10;
+  optional string trace_id = 7;
   // span_id is added to all request_scoped logs
-  optional string span_id = 11;
-  reserved 12 to 29;
+  optional string span_id = 8;
+  reserved 9 to 29;
+  optional ServiceContext service = 30;
+  optional Exception exception = 31;
+  optional APIContext api = 32;
+  optional UserContext user = 33;
+  optional HTTPRequest http = 34;
+  message ServiceContext {
+    optional string service = 1; // for example "zitadel"
+    optional string version = 2; // for example "v2.67.2"
+    optional string process = 3; // for example the Kubernetes pod ID
+  }
   message Exception {
     optional string id = 1; // The ZitadelError id
     optional string key = 2; // The ZitadelError i18n key
@@ -63,6 +70,17 @@ message Record {
       (sensitive) = true,
       (pii) = true
     ];
+  }
+  message APIContext {
+    string service = 1;
+    string method = 2;
+    optional string resource = 3;
+  }
+  message UserContext {
+    string user_id = 1 [(pii) = true];
+    string org_id = 2;
+    optional string client_id = 3;
+    optional string project_id = 4;
   }
   message HTTPRequest {
     string protocol = 1;
@@ -81,6 +99,9 @@ message Record {
     string referer = 6;
     string userAgent = 7 [(pii) = true];
     string remote_ip = 8 [(pii) = true];
+    google.protobuf.Duration latency = 9;
+    optional Message request = 10;
+    optional Message response = 11;
     message Message {
       map<string,string> headers = 1 [
         (sensitive) = true,
@@ -92,46 +113,5 @@ message Record {
       ];
       uint64 bytes = 3;
     }
-    optional Message request = 9;
-    optional Message response = 10;
-    google.protobuf.Duration latency = 17;
-    optional string user_id = 18 [(pii) = true];
-  }
-  message Authentication {
-    optional string user_id = 1 [(pii) = true];
-    enum Method {
-      MethodUndefined = 0;
-      SystemUserToken = 1;
-      OIDCAccessToken = 2;
-      OIDCRefreshToken = 3;
-      SessionAPI = 4;
-      SAMLResponse = 5;
-    }
-    Method method = 2;
-    bool success = 3;
-  }
-  message Authorization {
-    string user_id = 1 [(pii) = true];
-    string org_id = 2;
-    optional string client_id = 3;
-    optional string project_id = 4;
-    bool success = 5;
-  }
-  message APICall {
-    string user_id = 1 [(pii) = true];
-    string org_id = 2;
-    string service = 3;
-    string method = 4;
-    optional string resource = 5;
-    int32 status = 6;
-  }
-  oneof stream {
-    Exception exception = 30;
-    HTTPRequest http = 31;
-    APICall api = 32;
-    Authentication authn = 33;
-    Authorization authz = 34;
-    // Event event = 35;
-    // Action action = 36;
   }
 }

@@ -24,7 +24,7 @@ type ZitadelHandler struct {
 	dynamic                   map[string]any
 }
 
-type WrapRecordFunc func(record *Record) proto.Message
+type WrapRecordFunc func(record *AccessRecord) proto.Message
 
 // NewZitadelHandler creates a new ZitadelHandler.
 // It writes structured JSON records to w.
@@ -72,18 +72,18 @@ func (z *ZitadelHandler) Handle(ctx context.Context, r slog.Record) error {
 
 // toSeverity maps slog.Level to Severity
 // Severity implements slog.StringerValuer
-func toSeverity(level slog.Level) Record_Severity {
+func toSeverity(level slog.Level) AccessRecord_Severity {
 	switch level {
 	case slog.LevelDebug:
-		return Record_Debug
+		return AccessRecord_Debug
 	case slog.LevelInfo:
-		return Record_Info
+		return AccessRecord_Info
 	case slog.LevelWarn:
-		return Record_Warn
+		return AccessRecord_Warn
 	case slog.LevelError:
-		return Record_Error
+		return AccessRecord_Error
 	default:
-		return Record_SeverityUndefined
+		return AccessRecord_SeverityUndefined
 	}
 }
 
@@ -105,15 +105,19 @@ func addStackTrace(slogPC uintptr) []string {
 }
 
 // mapRecordToProto maps slog.Record to a Protobuf Record.
-func (z *ZitadelHandler) mapRecordToProto(ctx context.Context, r slog.Record) (*Record, error) {
+func (z *ZitadelHandler) mapRecordToProto(ctx context.Context, r slog.Record) (*AccessRecord, error) {
 	severity := toSeverity(r.Level)
-	record := &Record{
+	record := &AccessRecord{
 		Time:     timestamppb.New(r.Time),
 		Severity: severity,
 		Message:  r.Message,
-		Service:  &z.service,
-		Version:  &z.version,
-		Process:  &z.process,
+	}
+	if z.service != "" || z.version != "" || z.process != "" {
+		record.Service = &AccessRecord_ServiceContext{
+			Service: &z.service,
+			Version: &z.version,
+			Process: &z.process,
+		}
 	}
 	span := trace.SpanFromContext(ctx)
 	spanCtx := span.SpanContext()
@@ -130,21 +134,28 @@ func (z *ZitadelHandler) mapRecordToProto(ctx context.Context, r slog.Record) (*
 			record.addDynamic(slog.Any(k, v))
 		}
 	}
-	if severity >= Record_Error || severity <= Record_Trace {
+	if severity >= AccessRecord_Error || severity <= AccessRecord_Trace {
 		record.StackTrace = addStackTrace(r.PC)
 	}
 	r.Attrs(func(attr slog.Attr) bool {
-		if streamValue, ok := attr.Value.Any().(isRecord_Stream); ok {
-			record.Stream = streamValue
-			return true
+		switch value := attr.Value.Any().(type) {
+		case *AccessRecord_Exception:
+			record.Exception = value
+		case *AccessRecord_APIContext:
+			record.Api = value
+		case *AccessRecord_UserContext:
+			record.User = value
+		case *AccessRecord_HTTPRequest:
+			record.Http = value
+		default:
+			record.addDynamic(attr)
 		}
-		record.addDynamic(attr)
 		return true
 	})
 	return record, nil
 }
 
-func (r *Record) addDynamic(attr slog.Attr) {
+func (r *AccessRecord) addDynamic(attr slog.Attr) {
 	if r.Dynamic == nil {
 		r.Dynamic = &structpb.Struct{}
 	}

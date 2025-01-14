@@ -19,7 +19,7 @@ extend google.protobuf.FieldOptions {
   bool pii = 50002;
 }
 
-message Record {
+message AccessRecord {
   google.protobuf.Timestamp time = 1;
   // Severity numbers are inspired by OTEL severity numbers.
   // https://opentelemetry.io/docs/specs/otel/logs/data-model/#mapping-of-severitynumber

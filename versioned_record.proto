@@ -2,11 +2,11 @@ syntax = "proto3";
 
 option go_package = "github.com/zitadel/logging";
 
-import "records/v1/record.proto";
+import "records/v1/access.proto";
 
 message VersionedRecord {
   oneof record {
-    Record record_v1 = 1;
-    // RecordV2 record_v2 = 2;
+    AccessRecord access_v1 = 1;
+    // AccessRecord access_v2 = 2;
   }
 }

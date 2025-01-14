@@ -48,7 +48,7 @@ func (c *Config) Slog() *slog.Logger {
 	case FormatterJSON:
 		handler = slog.NewJSONHandler(os.Stderr, opts)
 	case FormatterZitadel:
-		handler = record_v1.NewZitadelHandler(os.Stderr, opts, func(record *record_v1.Record) proto.Message {
+		handler = record_v1.NewZitadelHandler(os.Stderr, opts, func(record *record_v1.AccessRecord) proto.Message {
 			return &VersionedRecord{Record: &VersionedRecord_RecordV1{RecordV1: record}}
 		}, "my service", "my version", "my pod id", map[string]any{"region": "AU1"})
 	case "":

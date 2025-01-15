@@ -19,7 +19,19 @@ extend google.protobuf.FieldOptions {
   bool pii = 50002;
 }
 
-message AccessRecord {
+message Exception {
+  optional string id = 1; // The ZitadelError id
+  optional string key = 2; // The ZitadelError i18n key
+  string description = 3 [ // The error message
+    (sensitive) = true,
+    (pii) = true
+  ];
+}
+
+
+
+
+message StreamRecord {
   google.protobuf.Timestamp time = 1;
   // Severity numbers are inspired by OTEL severity numbers.
   // https://opentelemetry.io/docs/specs/otel/logs/data-model/#mapping-of-severitynumber
@@ -54,29 +66,20 @@ message AccessRecord {
   optional string span_id = 8;
   reserved 9 to 29;
   optional ServiceContext service = 30;
-  optional Exception exception = 31;
   optional APIContext api = 32;
-  optional UserContext user = 33;
+  optional ZitadelContext user = 33;
   optional HTTPRequest http = 34;
   message ServiceContext {
     optional string service = 1; // for example "zitadel"
     optional string version = 2; // for example "v2.67.2"
     optional string process = 3; // for example the Kubernetes pod ID
   }
-  message Exception {
-    optional string id = 1; // The ZitadelError id
-    optional string key = 2; // The ZitadelError i18n key
-    string description = 3 [ // The error message
-      (sensitive) = true,
-      (pii) = true
-    ];
-  }
   message APIContext {
     string service = 1;
     string method = 2;
     optional string resource = 3;
   }
-  message UserContext {
+  message ZitadelContext {
     string user_id = 1 [(pii) = true];
     string org_id = 2;
     optional string client_id = 3;

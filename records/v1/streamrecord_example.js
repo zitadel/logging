@@ -1,26 +1,21 @@
-// The streamRecord has flat properties in snake_case.
+// All stream records have flat properties in snake_case.
 // This makes them very easy map them to database columns and use them in queries.
-// The fields following fields are potentially set in all stream records.
-// - "stream"
-// - "version"
-// - "observed_time"
-// - "instance_id"
-// - "trace_id",
-// - "span_id"
-// The properties "stream" and "version" define what additional fields are potentially available in the record
-streamRecord = {
-  // Possible values for "stream":
-  // - "request_grpc"
-  // - "request_http"
-  // - "runtime_version",
-  // - "runtime_service",
-  // - "notification"
-  // - "action_targetcall"
-  // - "action_trigger_grpc_request"
-  // - "action_trigger_grpc_response"
-  // - "action_trigger_event"
-  // - "action_trigger_function"
-  // - "event"
+
+// baseStreamRecord shows which fields are potentially set in all stream records.
+// The properties "stream" and "version" define what additional fields are potentially available in the record.
+// Possible values for "stream":
+// - "request_grpc"
+// - "request_http"
+// - "runtime_version",
+// - "runtime_service",
+// - "action_targetcall"
+// - "action_trigger_grpc_request"
+// - "action_trigger_grpc_response"
+// - "action_trigger_event"
+// - "action_trigger_function"
+// - "event"
+// - "notification"
+baseStreamRecord = {
   "stream": "request_http",
   "version": "v1",
   "observed_time": "20250114T162059Z", // ISO 8601 Timestamp
@@ -34,33 +29,52 @@ streamRecord = {
   // for example
   // - "region": "US1",
   // - "runtime_service_version": "v2.67.2" // so it is not only available in a single runtime_service record but in all records
+}
 
-  // The "runtime" stream contains normal log records that are written all over the Zitadel code.
-  // if stream is runtime_*
+// The "runtime" stream contains normal log records that are written all over the Zitadel code.
+// These fields are present in streams that have the runtime_ prefix
+runtimeBaseStreamRecord = {
+  ...baseStreamRecord, // all fields from baseStreamRecord
+
   "runtime_severity": "info",
   "runtime_message": "user created",
   // runtime_attributes_* contains additional information passed in the log record
   // these properties have no guaranteed schema.
   "runtime_attributes_userid": "1234567890123",
+}
 
-  // if stream is runtime_service
-  // A record is only written once in a runtime lifecycle
+// if stream is runtime_service
+// A record is only written once in a runtime lifecycle
+runtimeServiceRecord = {
+  ...runtimeBaseStreamRecord, // all fields from runtimeBaseStreamRecord
+
   "runtime_service_name": "zitadel",
   "runtime_service_version": "v2.67.2",
   "runtime_service_process": "sdsf321ew6f5", // For example Pod ID
+}
 
-  // runtime_error
+// if stream is runtime_error
+runtimeErrorRecord = {
+  ...runtimeBaseStreamRecord, // all fields from runtimeBaseStreamRecord
+
   "runtime_error_cause": "user not found by email user@example.com: no rows in result set",
   "runtime_error_stack": "line1\nline2\nline3",
   "runtime_error_i18n_key": "Errors.User.NotFound", // If error is of type ZitadelError
   "runtime_error_type": "InternalError", // If error is of type ZitadelError
+}
 
+// These fields are present in streams that have the request_ prefix
+requestBaseRecord = {
   // request*
   "request_is_system_user": false,
   "request_is_authenticated": true,
   "request_latency": "50ms",
+}
 
-  // request_http
+// if stream is request_http
+requestHttpRecord = {
+  ...requestBaseRecord, // all fields from requestBaseRecord
+
   "request_http_protocol": "",
   "request_http_host": "",
   "request_http_port": "",
@@ -72,48 +86,93 @@ streamRecord = {
   "request_http_remote_ip": "",
   "request_http_bytes_received": 1000,
   "request_http_bytes_sent": 1000,
+}
 
-  // request_grpc
+// if stream is request_grpc
+requestGrpcRecord = {
+  ...requestBaseRecord, // all fields from requestBaseRecord
+
   "request_grpc_service": "",
   "request_grpc_method": "",
   "request_grpc_code": "",
+}
 
-  // action_targetcall
+// These fields are present in streams that have the action_ prefix
+actionTargetCallRecord = {
+  "action_target_id": "",
+  "action_name": "",
+  "action_protocol": "",
+  "action_host": "",
+  "action_port": "",
+  "action_path": "",
+  "action_method": "",
+  "action_status": 200,
+}
 
-  "action_targetcall_target_id": "",
-  "action_targetcall_name": "",
-  "action_targetcall_protocol": "",
-  "action_targetcall_host": "",
-  "action_targetcall_port": "",
-  "action_targetcall_path": "",
-  "action_targetcall_method": "",
-  "action_targetcall_status": 200,
+// if stream is action_trigger_event
+actionTriggerEventRecord = {
+  "action_trigger_event_id": "",
+}
 
-  //action_trigger_grpc*
+// if stream is action_trigger_function
+actionTriggerFunctionRecord = {
+  "action_trigger_function_name": "",
+}
+
+// These fields are present in streams that have the action_trigger_grpc_ prefix
+actionTriggerGrpcBaseRecord = {
   "action_trigger_grpc_service": "",
   "action_trigger_grpc_method": "",
+}
 
-  // action_trigger_grpc_request
+// if stream is action_trigger_grpc_request
+actionTriggerGrpcRequestRecord = {
+  ...actionTriggerGrpcBaseRecord,  // all fields from actionTriggerGrpcBaseRecord
   // (no additional properties)
+}
 
-  // action_trigger_grpc_response
+// if stream is action_trigger_grpc_response
+actionTriggerGrpcResponseRecord = {
+  ...actionTriggerGrpcBaseRecord,  // all fields from actionTriggerGrpcBaseRecord
+
   "action_trigger_grpc_response_code": 200,
+}
 
-  // action_trigger_event
-  "action_trigger_event_id": "",
-
-  // action_trigger_function
-  "action_trigger_function_name": "",
-
-  // event
+// if stream is event
+eventRecord = {
   "event_id": "",
   "event_sequence": "",
   "event_position": "",
   "event_type": "",
-  "event_data": {},
+  "event_data": {}, // dynamically typed
   "event_editor_user": "",
   "event_version": "",
   "event_aggregate_id": "",
   "event_aggregate_type": "",
   "event_resource_owner": "",
+}
+
+// These fields are present in streams that have the notification_ prefix
+notificationBaseRecord = {
+  "notification_messagetype": "",
+  "notification_triggering_event_id": "",
+}
+
+notificationEmailRecord = {
+  ...notificationBaseRecord,   // all fields from notificationBaseRecord
+
+  "notification_email_smtpprovider_id": "",
+  "notification_email_receipient": "",
+}
+
+notificationSMSRecord = {
+  ...notificationBaseRecord,   // all fields from notificationBaseRecord
+
+  "notification_sms_phonenumber": "",
+}
+
+notificationWebhookRecord = {
+  ...notificationBaseRecord,   // all fields from notificationBaseRecord
+
+  "notification_webhook_url": "",
 }

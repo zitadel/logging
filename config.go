@@ -71,6 +71,8 @@ func (c *Config) setGlobal() {
 		logrus.FatalLevel,
 		logrus.ErrorLevel,
 		logrus.WarnLevel,
+		logrus.InfoLevel,
+		logrus.DebugLevel,
 	)))
 	log = (*logger)(logrus.StandardLogger())
 }

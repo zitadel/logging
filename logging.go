@@ -37,7 +37,7 @@ func LogWithFields(id string, fields ...interface{}) *Entry {
 
 // New instantiates a new entry
 func New() *Entry {
-	return WithFields(context.Background())
+	return WithContext(context.Background())
 }
 
 func WithContext(ctx context.Context) *Entry {

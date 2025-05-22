@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"context"
 	"fmt"
 	"runtime"
 	"time"
@@ -36,7 +37,11 @@ func LogWithFields(id string, fields ...interface{}) *Entry {
 
 // New instantiates a new entry
 func New() *Entry {
-	return &Entry{Entry: logrus.NewEntry((*logrus.Logger)(log))}
+	return WithFields(context.Background())
+}
+
+func WithContext(ctx context.Context) *Entry {
+	return &Entry{Entry: logrus.NewEntry((*logrus.Logger)(log)).WithContext(ctx)}
 }
 
 func OnError(err error) *Entry {

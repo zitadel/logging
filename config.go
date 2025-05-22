@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/sirupsen/logrus"
+	"github.com/uptrace/opentelemetry-go-extra/otellogrus"
 )
 
 type Config struct {
@@ -65,6 +66,12 @@ func (c *Config) setGlobal() {
 	logrus.SetFormatter(log.Formatter)
 	logrus.SetLevel(log.Level)
 	logrus.SetReportCaller(log.ReportCaller)
+	logrus.AddHook(otellogrus.NewHook(otellogrus.WithLevels(
+		logrus.PanicLevel,
+		logrus.FatalLevel,
+		logrus.ErrorLevel,
+		logrus.WarnLevel,
+	)))
 	log = (*logger)(logrus.StandardLogger())
 }
 

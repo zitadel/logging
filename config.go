@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/sirupsen/logrus"
-	"github.com/uptrace/opentelemetry-go-extra/otellogrus"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type Config struct {
@@ -66,15 +66,25 @@ func (c *Config) setGlobal() {
 	logrus.SetFormatter(log.Formatter)
 	logrus.SetLevel(log.Level)
 	logrus.SetReportCaller(log.ReportCaller)
-	logrus.AddHook(otellogrus.NewHook(otellogrus.WithLevels(
-		logrus.PanicLevel,
-		logrus.FatalLevel,
-		logrus.ErrorLevel,
-		logrus.WarnLevel,
-		logrus.InfoLevel,
-		logrus.DebugLevel,
-	)))
+	logrus.AddHook(&TracingHook{})
 	log = (*logger)(logrus.StandardLogger())
+}
+
+type TracingHook struct{}
+
+func (t *TracingHook) Levels() []logrus.Level {
+	return logrus.AllLevels
+}
+
+func (t *TracingHook) Fire(e *logrus.Entry) error {
+	span := trace.SpanContextFromContext(e.Context)
+	if span.HasTraceID() {
+		e.Data["trace_id"] = span.TraceID().String()
+	}
+	if span.HasSpanID() {
+		e.Data["span_id"] = span.SpanID().String()
+	}
+	return nil
 }
 
 func (c *Config) unmarshalFormatter() error {

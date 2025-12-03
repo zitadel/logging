@@ -1,6 +1,6 @@
 module github.com/zitadel/logging
 
-go 1.23.7
+go 1.24.10
 
 require (
 	github.com/sirupsen/logrus v1.9.3

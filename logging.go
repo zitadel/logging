@@ -1,3 +1,6 @@
+// Package logging provides a wrapper around logrus with additional features
+//
+// Deprecated: This package is no longer maintained. Use [slog] instead.
 package logging
 
 import (
